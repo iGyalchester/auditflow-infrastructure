@@ -30,6 +30,21 @@ env:
   AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
 
 jobs:
+  # TEMPORARY diagnostic: decodes the OIDC token claims (not the token
+  # itself) so trust-policy mismatches are visible. Remove once CI applies
+  # succeed.
+  oidc-claims:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Decode OIDC claims
+        run: |
+          RESP=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+          PAYLOAD=$(echo "$RESP" | jq -r '.value' | cut -d. -f2)
+          PAD=$(( (4 - ${#PAYLOAD} % 4) % 4 ))
+          echo "$PAYLOAD$(printf '=%.0s' $(seq 1 $PAD))" | base64 -d | jq '{iss, aud, sub, repository, environment, ref, repository_owner}'
+
   fmt-and-validate:
     name: fmt & validate (${{ matrix.environment }})
     runs-on: ubuntu-latest
