@@ -95,6 +95,7 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "iam:PassRole",
       "iam:ListRolePolicies",
       "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfilesForRole",
     ]
     resources = ["*"]
   }
