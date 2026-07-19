@@ -15,9 +15,9 @@ variable "cognito_client_id" {
 }
 
 variable "integration_uri" {
-  description = "Where routes proxy to. Placeholder until a compute target (ECS/EKS/Fargate) is provisioned in a later phase - see README."
+  description = "Where routes proxy to (e.g. an ALB in front of ECS/EKS). Null until a compute target exists - the API, authorizer, and stage are still created so the endpoint/issuer wiring is stable, but no routes are attached and every request 404s."
   type        = string
-  default     = "http://placeholder.internal:8080/{proxy}"
+  default     = null
 }
 
 variable "log_retention_days" {

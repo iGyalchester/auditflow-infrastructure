@@ -16,10 +16,13 @@ resource "aws_apigatewayv2_authorizer" "cognito" {
   }
 }
 
-# HTTP_PROXY to a placeholder URI until real compute (ECS/EKS/Fargate) is
-# provisioned - api-gateway-service's own JwtAuthFilter (in the app repo)
-# stays as defense in depth even once this is wired to something real.
+# Integration and route only exist once a real compute target (ECS/EKS/
+# Fargate behind an ALB) is provisioned and its URI passed in - API Gateway
+# rejects placeholder/unresolvable URIs at create time. Until then the API
+# answers every request with 404. api-gateway-service's own JwtAuthFilter
+# (in the app repo) stays as defense in depth once this is wired up.
 resource "aws_apigatewayv2_integration" "backend" {
+  count                  = var.integration_uri == null ? 0 : 1
   api_id                 = aws_apigatewayv2_api.this.id
   integration_type       = "HTTP_PROXY"
   integration_method     = "ANY"
@@ -28,9 +31,10 @@ resource "aws_apigatewayv2_integration" "backend" {
 }
 
 resource "aws_apigatewayv2_route" "proxy" {
+  count              = var.integration_uri == null ? 0 : 1
   api_id             = aws_apigatewayv2_api.this.id
   route_key          = "ANY /{proxy+}"
-  target             = "integrations/${aws_apigatewayv2_integration.backend.id}"
+  target             = "integrations/${aws_apigatewayv2_integration.backend[0].id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }

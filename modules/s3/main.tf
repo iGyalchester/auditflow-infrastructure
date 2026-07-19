@@ -57,7 +57,7 @@ resource "aws_s3_bucket_public_access_block" "evidence" {
 # Lock check, plus refuses any non-TLS access.
 data "aws_iam_policy_document" "evidence" {
   statement {
-    sid    = "DenyDelete"
+    sid    = "DenyObjectDeletion"
     effect = "Deny"
     principals {
       type        = "*"
@@ -66,9 +66,21 @@ data "aws_iam_policy_document" "evidence" {
     actions = [
       "s3:DeleteObject",
       "s3:DeleteObjectVersion",
-      "s3:PutLifecycleConfiguration",
     ]
     resources = ["${aws_s3_bucket.evidence.arn}/*"]
+  }
+
+  # Bucket-level action - must target the bucket ARN, not objects, or S3
+  # rejects the policy as malformed.
+  statement {
+    sid    = "DenyLifecycleTampering"
+    effect = "Deny"
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    actions   = ["s3:PutLifecycleConfiguration"]
+    resources = [aws_s3_bucket.evidence.arn]
   }
 
   statement {
