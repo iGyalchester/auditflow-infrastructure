@@ -4,8 +4,8 @@ vpc_cidr   = "10.20.0.0/16"
 
 single_nat_gateway = true
 
-evidence_bucket_name  = "auditflow-evidence-staging-changeme"
-cognito_domain_prefix = "auditflow-staging-changeme"
+evidence_bucket_name  = "auditflow-evidence-staging-869935094950"
+cognito_domain_prefix = "auditflow-staging-869935094950"
 
 object_lock_retention_days = 365
 

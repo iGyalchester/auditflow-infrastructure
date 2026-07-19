@@ -4,9 +4,8 @@ vpc_cidr   = "10.10.0.0/16"
 
 single_nat_gateway = true
 
-# Both of these must be globally unique - pick a real value before applying.
-evidence_bucket_name  = "auditflow-evidence-dev-changeme"
-cognito_domain_prefix = "auditflow-dev-changeme"
+evidence_bucket_name  = "auditflow-evidence-dev-869935094950"
+cognito_domain_prefix = "auditflow-dev-869935094950"
 
 object_lock_retention_days = 90
 
