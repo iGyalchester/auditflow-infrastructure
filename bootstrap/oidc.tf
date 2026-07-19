@@ -14,14 +14,20 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 }
 
 locals {
-  # Jobs that reference a GitHub Environment present an
-  # `environment:<name>` subject instead of the ref/pull_request forms,
-  # so all three shapes must be trusted.
+  # Two axes of variation in GitHub's OIDC subject:
+  # - Jobs bound to a GitHub Environment present `environment:<name>`
+  #   instead of the ref/pull_request forms.
+  # - GitHub's immutable-reference format appends "@<numeric id>" to the
+  #   owner and repo segments (e.g. repo:org@123/name@456:...), so each
+  #   pattern needs a classic and an @-suffixed variant.
   github_subjects = flatten([
     for repo in var.github_repos : [
       "repo:${var.github_org}/${repo}:ref:refs/heads/main",
       "repo:${var.github_org}/${repo}:pull_request",
       "repo:${var.github_org}/${repo}:environment:*",
+      "repo:${var.github_org}@*/${repo}@*:ref:refs/heads/main",
+      "repo:${var.github_org}@*/${repo}@*:pull_request",
+      "repo:${var.github_org}@*/${repo}@*:environment:*",
     ]
   ])
 }
