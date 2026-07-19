@@ -6,6 +6,17 @@ on:
   push:
     branches: [main]
     paths: ["environments/**", "modules/**"]
+  # Staging and prod are never applied automatically - only via this manual
+  # trigger (Actions tab > Terraform > Run workflow). Environment protection
+  # rules would be the nicer gate, but they require a paid plan on private
+  # repos, so the gate lives in the workflow itself.
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to apply"
+        required: true
+        type: choice
+        options: [dev, staging, prod]
 
 permissions:
   id-token: write # required to assume the AWS role via OIDC
@@ -98,14 +109,13 @@ jobs:
     name: apply (${{ matrix.environment }})
     runs-on: ubuntu-latest
     needs: [fmt-and-validate]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     strategy:
+      # Push to main auto-applies dev ONLY. Staging/prod come exclusively
+      # from the workflow_dispatch input above.
       matrix:
-        environment: [dev, staging, prod]
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.environment)) || fromJSON('["dev"]') }}
       max-parallel: 1
-    # Each matching GitHub Environment can require manual reviewers -
-    # gate staging/prod apply on a human clicking "approve" without
-    # touching this workflow.
     environment: ${{ matrix.environment }}
     steps:
       - uses: actions/checkout@v4
