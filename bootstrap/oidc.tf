@@ -80,6 +80,7 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "kms:*",
       "logs:*",
       "cloudwatch:*",
+      "sns:*",
       "ec2:*",
       "iam:GetRole",
       "iam:CreateRole",
