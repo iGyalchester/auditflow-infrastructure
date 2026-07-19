@@ -1,0 +1,75 @@
+name: Terraform Destroy
+
+# Manual-only teardown. Destroys an environment's compute/network/identity
+# stack but RETAINS the evidence bucket and KMS key: the bucket has
+# prevent_destroy + Object Lock (deleting it is meant to be hard), and
+# keeping the pair in state makes the next apply a clean incremental one.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to tear down"
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+      confirm:
+        description: "Type the environment name again to confirm"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_VERSION: "1.13.5"
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+
+jobs:
+  destroy:
+    name: destroy (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    if: inputs.environment == inputs.confirm
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Write backend config
+        working-directory: environments/${{ inputs.environment }}
+        run: |
+          cat > backend.hcl <<EOF
+          bucket       = "${{ vars.TF_STATE_BUCKET }}"
+          key          = "${{ inputs.environment }}/terraform.tfstate"
+          region       = "${{ env.AWS_REGION }}"
+          use_lockfile = true
+          encrypt      = true
+          EOF
+
+      - name: terraform init
+        working-directory: environments/${{ inputs.environment }}
+        run: terraform init -backend-config=backend.hcl
+
+      - name: terraform destroy (retains evidence bucket + KMS)
+        working-directory: environments/${{ inputs.environment }}
+        run: |
+          terraform destroy -var-file=terraform.tfvars -input=false -auto-approve \
+            -target=module.network \
+            -target=module.msk \
+            -target=module.aurora \
+            -target=module.glue \
+            -target=module.athena \
+            -target=module.emr \
+            -target=module.cognito \
+            -target=module.api_gateway \
+            -target=module.monitoring
