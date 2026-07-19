@@ -1,0 +1,77 @@
+variable "aws_region" {
+  type    = string
+  default = "us-east-1"
+}
+
+variable "azs" {
+  type    = list(string)
+  default = ["us-east-1a", "us-east-1b"]
+}
+
+variable "vpc_cidr" {
+  type    = string
+  default = "10.20.0.0/16"
+}
+
+variable "single_nat_gateway" {
+  type    = bool
+  default = true
+}
+
+variable "evidence_bucket_name" {
+  type = string
+}
+
+variable "object_lock_retention_days" {
+  type    = number
+  default = 365
+}
+
+variable "aurora_min_capacity_acu" {
+  type    = number
+  default = 0.5
+}
+
+variable "aurora_max_capacity_acu" {
+  type    = number
+  default = 4
+}
+
+variable "aurora_instance_count" {
+  type    = number
+  default = 2
+}
+
+variable "aurora_deletion_protection" {
+  type    = bool
+  default = true
+}
+
+variable "aurora_skip_final_snapshot" {
+  type    = bool
+  default = false
+}
+
+variable "emr_max_concurrent_vcpus" {
+  type    = number
+  default = 32
+}
+
+variable "cognito_domain_prefix" {
+  type = string
+}
+
+variable "cognito_callback_urls" {
+  type    = list(string)
+  default = ["https://staging.auditflow.example.com/callback"]
+}
+
+variable "cognito_logout_urls" {
+  type    = list(string)
+  default = ["https://staging.auditflow.example.com/"]
+}
+
+variable "alert_email" {
+  type    = string
+  default = null
+}
