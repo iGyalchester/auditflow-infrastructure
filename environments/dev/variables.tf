@@ -77,3 +77,20 @@ variable "alert_email" {
   type    = string
   default = null
 }
+
+
+variable "ecs_enabled" {
+  description = "Provision the Fargate services + internal ALB. Off by default: push images first (Deploy workflow in auditflow-platform), then flip - compute bills from the moment this applies."
+  type        = bool
+  default     = false
+}
+
+variable "ecs_image_tag" {
+  type    = string
+  default = "latest"
+}
+
+variable "ecs_desired_count" {
+  type    = number
+  default = 1
+}

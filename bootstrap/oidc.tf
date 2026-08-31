@@ -70,6 +70,9 @@ data "aws_iam_policy_document" "github_actions_deploy" {
     effect = "Allow"
     actions = [
       "s3:*",
+      "ecs:*",
+      "ecr:*",
+      "elasticloadbalancing:*",
       "kafka:*",
       "rds:*",
       "glue:*",

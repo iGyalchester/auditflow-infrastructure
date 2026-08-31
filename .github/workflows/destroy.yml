@@ -65,6 +65,7 @@ jobs:
         run: |
           terraform destroy -var-file=terraform.tfvars -input=false -auto-approve \
             -target=module.network \
+            -target=module.ecs \
             -target=module.msk \
             -target=module.aurora \
             -target=module.glue \

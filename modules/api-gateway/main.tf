@@ -16,22 +16,35 @@ resource "aws_apigatewayv2_authorizer" "cognito" {
   }
 }
 
-# Integration and route only exist once a real compute target (ECS/EKS/
-# Fargate behind an ALB) is provisioned and its URI passed in - API Gateway
-# rejects placeholder/unresolvable URIs at create time. Until then the API
-# answers every request with 404. api-gateway-service's own JwtAuthFilter
-# (in the app repo) stays as defense in depth once this is wired up.
+# The backend is the internal ALB in front of api-gateway-service (see
+# modules/ecs), reached through a VPC link - a private ALB is not routable
+# from API Gateway without one. Gated on enable_backend_integration (a
+# plain bool, so count is known at plan time even while the ECS module's
+# outputs are not). While disabled the API, authorizer, and stage still
+# exist so the endpoint/issuer wiring is stable, but every request 404s.
+# api-gateway-service's own JwtAuthFilter (app repo) stays as defense in
+# depth behind the JWT authorizer here.
+resource "aws_apigatewayv2_vpc_link" "backend" {
+  count              = var.enable_backend_integration ? 1 : 0
+  name               = var.name
+  subnet_ids         = var.vpc_link_subnet_ids
+  security_group_ids = var.vpc_link_security_group_ids
+  tags               = var.tags
+}
+
 resource "aws_apigatewayv2_integration" "backend" {
-  count                  = var.integration_uri == null ? 0 : 1
+  count                  = var.enable_backend_integration ? 1 : 0
   api_id                 = aws_apigatewayv2_api.this.id
   integration_type       = "HTTP_PROXY"
   integration_method     = "ANY"
-  integration_uri        = var.integration_uri
+  integration_uri        = var.alb_listener_arn
+  connection_type        = "VPC_LINK"
+  connection_id          = aws_apigatewayv2_vpc_link.backend[0].id
   payload_format_version = "1.0"
 }
 
 resource "aws_apigatewayv2_route" "proxy" {
-  count              = var.integration_uri == null ? 0 : 1
+  count              = var.enable_backend_integration ? 1 : 0
   api_id             = aws_apigatewayv2_api.this.id
   route_key          = "ANY /{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.backend[0].id}"

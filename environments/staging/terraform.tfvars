@@ -21,3 +21,9 @@ cognito_callback_urls = ["https://staging.auditflow.example.com/callback"]
 cognito_logout_urls   = ["https://staging.auditflow.example.com/"]
 
 alert_email = null
+
+# Flip to true only after images exist in ECR (see auditflow-platform's
+# Deploy workflow) - Fargate + the ALB start billing on apply.
+ecs_enabled       = false
+ecs_image_tag     = "latest"
+ecs_desired_count = 1

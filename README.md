@@ -17,7 +17,9 @@ modules/
   athena/              Athena workgroup (forced encryption) + query-results bucket.
   emr/                 EMR Serverless Spark application for anomaly-detection batch jobs.
   cognito/             User pool (with a customer_id custom attribute) + app client.
-  api-gateway/         HTTP API Gateway with a Cognito JWT authorizer.
+  api-gateway/         HTTP API Gateway with a Cognito JWT authorizer + VPC link to the ECS ALB.
+  ecr/                 One image repository per platform service (scan-on-push, lifecycle-pruned).
+  ecs/                 Fargate services for auditflow-platform, internal ALB in front of api-gateway-service.
   monitoring/          SNS alert topic, Aurora CPU alarms, API Gateway 5xx alarm.
 environments/
   dev/, staging/, prod/  Root modules composing the above, one per environment.
@@ -102,9 +104,14 @@ privilege to create the bootstrap resources (only needed once, by a human).
 
 ## Open questions / not done here
 
-- **No compute target for `api-gateway`'s integration yet.** It proxies to
-  a placeholder URI until ECS/EKS/Fargate is chosen for running the
-  `auditflow-platform` services - see that module's README comment.
+- ~~No compute target for `api-gateway`'s integration~~ **Resolved: ECS
+  Fargate** (`modules/ecs` + a VPC link in `modules/api-gateway`), gated
+  behind `ecs_enabled` per environment. Rollout order: apply (creates the
+  ECR repos), run the **Deploy** workflow in `auditflow-platform` to push
+  images, flip `ecs_enabled = true` in the environment's tfvars, apply
+  again. Fargate + the internal ALB bill from that second apply onward;
+  the app services' `aws` Spring profile handles MSK IAM auth and the
+  RDS-managed Aurora credentials.
 - **IAM policy on the GitHub Actions role is service-scoped, not
   resource-scoped** (`resources = ["*"]` per allowed service). Tightening
   this to specific ARNs is easiest once the first `apply` has produced real
