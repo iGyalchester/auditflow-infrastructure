@@ -38,11 +38,11 @@ destroys are manual `workflow_dispatch` only.
 
 ## Open items (known, tracked in README)
 
-- **No compute target yet**: the api-gateway module's integration/route
-  are conditionally absent until ECS/EKS/Fargate is chosen for the
-  platform services — the deployed API 404s by design until then. This is
-  the biggest missing seam between the two repos (no app profile consumes
-  MSK IAM auth / Aurora's managed secret / the real bucket yet either).
+- **Compute target: resolved — ECS Fargate** (`modules/ecs` + `modules/ecr`
+  + a VPC link in `modules/api-gateway`), gated behind `ecs_enabled` per
+  environment so nothing bills until images exist and the flag is flipped.
+  Rollout order is in the README; the app repo's `aws` profile handles MSK
+  IAM auth, the RDS-managed Aurora secret, and the real evidence bucket.
 - GitHub Actions deploy role is service-scoped (`resources = ["*"]`);
   tighten to real ARNs post-apply.
 - No WAF/CloudFront in front of API Gateway; single-region (no DR).
