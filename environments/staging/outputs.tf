@@ -41,3 +41,8 @@ output "glue_database_name" {
 output "emr_application_id" {
   value = module.emr.application_id
 }
+
+
+output "ecr_repository_urls" {
+  value = module.ecr.repository_urls
+}

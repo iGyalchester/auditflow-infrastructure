@@ -22,3 +22,9 @@ cognito_logout_urls   = ["https://app.auditflow.example.com/"]
 
 # Required in prod - SNS sends a subscription-confirmation email on first apply.
 alert_email = "borisgerard333@gmail.com"
+
+# Flip to true only after images exist in ECR (see auditflow-platform's
+# Deploy workflow) - Fargate + the ALB start billing on apply.
+ecs_enabled       = false
+ecs_image_tag     = "latest"
+ecs_desired_count = 2

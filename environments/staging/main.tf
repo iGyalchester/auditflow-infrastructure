@@ -104,7 +104,13 @@ module "api_gateway" {
   aws_region           = var.aws_region
   cognito_user_pool_id = module.cognito.user_pool_id
   cognito_client_id    = module.cognito.user_pool_client_id
-  tags                 = local.tags
+
+  enable_backend_integration  = var.ecs_enabled
+  alb_listener_arn            = one(module.ecs[*].alb_listener_arn)
+  vpc_link_subnet_ids         = module.network.private_subnet_ids
+  vpc_link_security_group_ids = module.ecs[*].alb_security_group_id
+
+  tags = local.tags
 }
 
 module "monitoring" {
@@ -115,4 +121,35 @@ module "monitoring" {
   aurora_instance_identifiers = module.aurora.instance_identifiers
   api_gateway_log_group_name  = module.api_gateway.access_log_group_name
   tags                        = local.tags
+}
+
+
+module "ecr" {
+  source = "../../modules/ecr"
+
+  name = local.name
+  tags = local.tags
+}
+
+# Gated off by default: push images first (the app repo's Deploy workflow),
+# THEN flip ecs_enabled - otherwise every task crash-loops pulling from an
+# empty registry while the ALB and Fargate bill by the hour.
+module "ecs" {
+  source = "../../modules/ecs"
+  count  = var.ecs_enabled ? 1 : 0
+
+  name                    = local.name
+  vpc_id                  = module.network.vpc_id
+  vpc_cidr                = module.network.vpc_cidr
+  private_subnet_ids      = module.network.private_subnet_ids
+  repository_urls         = module.ecr.repository_urls
+  image_tag               = var.ecs_image_tag
+  desired_count           = var.ecs_desired_count
+  kafka_bootstrap_servers = module.msk.bootstrap_brokers_sasl_iam
+  msk_cluster_arn         = module.msk.cluster_arn
+  aurora_endpoint         = module.aurora.cluster_endpoint
+  aurora_secret_arn       = module.aurora.master_user_secret_arn
+  evidence_bucket_name    = module.s3_evidence.bucket_name
+  evidence_bucket_arn     = module.s3_evidence.bucket_arn
+  tags                    = local.tags
 }
