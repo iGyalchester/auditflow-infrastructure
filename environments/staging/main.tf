@@ -153,5 +153,10 @@ module "ecs" {
   evidence_bucket_arn     = module.s3_evidence.bucket_arn
   cognito_user_pool_id    = module.cognito.user_pool_id
   cognito_client_id       = module.cognito.user_pool_client_id
-  tags                    = local.tags
+
+  alert_slack_webhook_secret_arn = var.alert_slack_webhook_secret_arn
+  alert_email_from               = var.alert_email_from
+  alert_email_to                 = var.alert_email_to
+
+  tags = local.tags
 }

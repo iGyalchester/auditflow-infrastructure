@@ -2,6 +2,14 @@
 # means once written, an object cannot be deleted or overwritten by anyone -
 # including the account root - until its retention period expires. This is
 # the durability guarantee an auditor is actually checking for.
+#
+# Retention stance, stated once: evidence is NEVER expired automatically.
+# There is deliberately no lifecycle configuration here, and the bucket
+# policy below denies s3:PutLifecycleConfiguration to every principal, so
+# one cannot be added quietly later. After object_lock_retention_days an
+# object becomes deletable, but deleting it is an explicit human decision
+# (and a policy change), not a timer. Cost is managed by choosing the lock
+# period per environment, not by expiring evidence.
 resource "aws_s3_bucket" "evidence" {
   bucket              = var.bucket_name
   object_lock_enabled = true

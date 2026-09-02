@@ -99,3 +99,21 @@ variable "cognito_client_id" {
   description = "Cognito app client id the gateway requires in the token audience."
   type        = string
 }
+
+variable "alert_slack_webhook_secret_arn" {
+  description = "Secrets Manager secret holding the Slack incoming-webhook URL for alerting-service (plain string secret). Empty = Slack notifier logs only."
+  type        = string
+  default     = ""
+}
+
+variable "alert_email_from" {
+  description = "SES-verified sender for alerting-service email notifications. Empty = email notifier logs only."
+  type        = string
+  default     = ""
+}
+
+variable "alert_email_to" {
+  description = "Comma-separated recipients for alerting-service email notifications."
+  type        = string
+  default     = ""
+}
