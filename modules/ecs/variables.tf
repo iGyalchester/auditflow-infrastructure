@@ -89,3 +89,13 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "cognito_user_pool_id" {
+  description = "Cognito user pool whose ID tokens api-gateway-service verifies (issuer is derived from it)."
+  type        = string
+}
+
+variable "cognito_client_id" {
+  description = "Cognito app client id the gateway requires in the token audience."
+  type        = string
+}

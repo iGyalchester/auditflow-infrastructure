@@ -258,6 +258,11 @@ resource "aws_ecs_task_definition" "service" {
         { name = "AURORA_JDBC_URL", value = "jdbc:postgresql://${var.aurora_endpoint}:5432/auditflow" },
         { name = "AUDIT_S3_BUCKET", value = var.evidence_bucket_name },
         { name = "AWS_REGION", value = data.aws_region.current.name },
+        # api-gateway-service verifies Cognito ID tokens itself (defense in
+        # depth behind the API Gateway authorizer); the aws profile turns
+        # enforcement on, these tell it which pool and app client to trust.
+        { name = "COGNITO_ISSUER_URI", value = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${var.cognito_user_pool_id}" },
+        { name = "COGNITO_CLIENT_ID", value = var.cognito_client_id },
       ]
       secrets = [
         { name = "AURORA_USERNAME", valueFrom = "${var.aurora_secret_arn}:username::" },
