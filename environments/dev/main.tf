@@ -151,5 +151,7 @@ module "ecs" {
   aurora_secret_arn       = module.aurora.master_user_secret_arn
   evidence_bucket_name    = module.s3_evidence.bucket_name
   evidence_bucket_arn     = module.s3_evidence.bucket_arn
+  cognito_user_pool_id    = module.cognito.user_pool_id
+  cognito_client_id       = module.cognito.user_pool_client_id
   tags                    = local.tags
 }
