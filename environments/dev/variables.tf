@@ -94,3 +94,21 @@ variable "ecs_desired_count" {
   type    = number
   default = 1
 }
+
+variable "alert_slack_webhook_secret_arn" {
+  description = "Secrets Manager secret (plain string) holding the Slack incoming-webhook URL for alert notifications. Empty = Slack alerts are logged, not sent."
+  type        = string
+  default     = ""
+}
+
+variable "alert_email_from" {
+  description = "SES-verified sender for alert emails. Empty = email alerts are logged, not sent."
+  type        = string
+  default     = ""
+}
+
+variable "alert_email_to" {
+  description = "Comma-separated recipients for alert emails."
+  type        = string
+  default     = ""
+}

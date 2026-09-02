@@ -102,6 +102,53 @@ privilege to create the bootstrap resources (only needed once, by a human).
    terraform apply -var-file=terraform.tfvars
    ```
 
+## Retention, per store
+
+| Store | Policy | Where it lives |
+|---|---|---|
+| S3 evidence | Object Lock, COMPLIANCE mode, `object_lock_retention_days` (365 default). **Never auto-expired**: no lifecycle rule by design, and the bucket policy denies adding one. Deletion after the lock is an explicit human act. | `modules/s3` |
+| Kafka topics | `retention.ms` = 7 days, declared by the producing service on startup (MSK Serverless retention is per topic). | `auditflow-platform` ingestion/enrichment config |
+| Aurora metadata | Rows older than `audit.retention.days` (400 default) purged nightly in batches by enrichment-service. Backups: `backup_retention_period` in `modules/aurora`. | `auditflow-platform` enrichment config |
+| CloudWatch logs | `log_retention_days` (90 default) on the ECS log group. | `modules/ecs` |
+
+## Alert notifications (ECS)
+
+`alerting-service` sends Slack and email alerts once told where. Per
+environment, in `terraform.tfvars`:
+
+```hcl
+alert_slack_webhook_secret_arn = "arn:aws:secretsmanager:...:secret:auditflow/slack-webhook-XXXX"
+alert_email_from               = "alerts@your-verified-domain.example"
+alert_email_to                 = "security@your-domain.example,oncall@your-domain.example"
+```
+
+Create the Slack secret by hand as a *plain string* (the webhook URL is a
+credential - anyone holding it can post to the channel - so it never goes
+in tfvars or environment variables). The email sender must be verified in
+SES; in SES sandbox mode recipients must be verified too. Leave either
+blank and that notifier logs instead of sending.
+
+## Troubleshooting
+
+### Bootstrap drift: `AccessDeniedException ... ecr:CreateRepository`
+
+The Terraform workflow's OIDC role gets its permissions from
+`bootstrap/oidc.tf`, which is applied **by hand** (step 1 above) - the
+role cannot widen its own policy. When a later change adds a new AWS
+service (ECR and ECS were added this way), the workflow fails with an
+AccessDenied naming that service until the bootstrap is re-applied:
+
+```bash
+cd bootstrap
+terraform apply \
+  -var="state_bucket_name=<the bucket from step 1>" \
+  -var="github_org=<your-github-org>"
+```
+
+Then re-run the failed workflow. Any `AccessDenied` from the workflow
+whose action is in `bootstrap/oidc.tf`'s allow list is this, not a bug in
+the environment configuration.
+
 ## Open questions / not done here
 
 - ~~No compute target for `api-gateway`'s integration~~ **Resolved: ECS

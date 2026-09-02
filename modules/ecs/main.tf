@@ -159,7 +159,7 @@ data "aws_iam_policy_document" "execution_secrets" {
   statement {
     effect    = "Allow"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [var.aurora_secret_arn]
+    resources = compact([var.aurora_secret_arn, var.alert_slack_webhook_secret_arn])
   }
 }
 
@@ -215,6 +215,17 @@ data "aws_iam_policy_document" "task" {
     actions   = ["s3:PutObject"]
     resources = ["${var.evidence_bucket_arn}/*"]
   }
+
+  # alerting-service sends through SES with the task role. Only granted
+  # when a sender is configured; SES identity ARNs are per verified
+  # address/domain, scope this to that identity once it exists.
+  dynamic "statement" {
+    for_each = var.alert_email_from != "" ? [1] : []
+    content {
+      actions   = ["ses:SendEmail", "ses:SendRawEmail"]
+      resources = ["*"]
+    }
+  }
 }
 
 resource "aws_iam_role" "task" {
@@ -252,7 +263,7 @@ resource "aws_ecs_task_definition" "service" {
       portMappings = [
         { containerPort = each.value, protocol = "tcp" }
       ]
-      environment = [
+      environment = concat([
         { name = "SPRING_PROFILES_ACTIVE", value = "aws" },
         { name = "KAFKA_BOOTSTRAP_SERVERS", value = var.kafka_bootstrap_servers },
         { name = "AURORA_JDBC_URL", value = "jdbc:postgresql://${var.aurora_endpoint}:5432/auditflow" },
@@ -263,11 +274,24 @@ resource "aws_ecs_task_definition" "service" {
         # enforcement on, these tell it which pool and app client to trust.
         { name = "COGNITO_ISSUER_URI", value = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${var.cognito_user_pool_id}" },
         { name = "COGNITO_CLIENT_ID", value = var.cognito_client_id },
-      ]
-      secrets = [
+        ],
+        # alerting-service notifier destinations. Blank = that notifier
+        # logs instead of sending (the service's own dev default).
+        each.key == "alerting-service" ? [
+          { name = "ALERT_EMAIL_FROM", value = var.alert_email_from },
+          { name = "ALERT_EMAIL_TO", value = var.alert_email_to },
+        ] : []
+      )
+      secrets = concat([
         { name = "AURORA_USERNAME", valueFrom = "${var.aurora_secret_arn}:username::" },
         { name = "AURORA_PASSWORD", valueFrom = "${var.aurora_secret_arn}:password::" },
-      ]
+        ],
+        # The Slack webhook URL is a credential (anyone holding it can post
+        # to the channel), so it comes from Secrets Manager, never plain env.
+        each.key == "alerting-service" && var.alert_slack_webhook_secret_arn != "" ? [
+          { name = "ALERT_SLACK_WEBHOOK_URL", valueFrom = var.alert_slack_webhook_secret_arn },
+        ] : []
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
