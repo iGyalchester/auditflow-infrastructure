@@ -11,7 +11,6 @@ variable "services" {
     ingestion-service   = 8081
     enrichment-service  = 8082
     alerting-service    = 8083
-    reporting-service   = 8084
   }
 }
 
