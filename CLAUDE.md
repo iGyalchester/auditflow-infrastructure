@@ -5,7 +5,7 @@
 Terraform for AuditFlow's AWS footprint — companion to the
 **`auditflow-platform`** application repo. Layout: hand-applied
 `bootstrap/` (state bucket with native S3 locking — no DynamoDB — plus a
-GitHub-OIDC deploy role), 11 reusable `modules/`, and `dev` / `staging` /
+GitHub-OIDC deploy role), 13 reusable `modules/`, and `dev` / `staging` /
 `prod` root modules under `environments/`. CI
 (`.github/workflows/terraform.yml`): fmt/validate/tfsec + plan on PRs,
 auto-apply **dev only** on push to main; staging/prod apply and all
@@ -35,6 +35,12 @@ destroys are manual `workflow_dispatch` only.
 - Multi-tenancy rides in the JWT: Cognito's immutable
   `custom:customer_id` attribute — keep it flowing through the API
   Gateway authorizer and access logs.
+- **The client IP the platform rate-limits on is set here, not by the
+  client.** `modules/api-gateway` maps
+  `"overwrite:header.x-client-ip" = "$context.identity.sourceIp"`. The
+  `overwrite:` prefix is what makes it trustworthy: it replaces any
+  `X-Client-IP` the caller sent. Drop the prefix (or the mapping) and every
+  caller can pick its own rate-limit bucket.
 
 ## Open items (known, tracked in README)
 
