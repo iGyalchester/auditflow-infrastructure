@@ -50,7 +50,10 @@ destroys are manual `workflow_dispatch` only.
   Rollout order is in the README; the app repo's `aws` profile handles MSK
   IAM auth, the RDS-managed Aurora secret, and the real evidence bucket.
 - GitHub Actions deploy role is service-scoped (`resources = ["*"]`);
-  tighten to real ARNs post-apply.
+  tighten to real ARNs post-apply. Pull-request plans no longer use it:
+  they assume a read-only role (`AWS_PLAN_ROLE_ARN`) whose trust policy is
+  the only one accepting the `pull_request` subject, so the blast radius of
+  a PR-triggered workflow is a read.
 - No WAF/CloudFront in front of API Gateway; single-region (no DR).
 - tfsec runs `soft_fail: true` — flip once its backlog is triaged.
 
