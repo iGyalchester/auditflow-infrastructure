@@ -103,10 +103,21 @@ resource "aws_lb_target_group" "api_gateway" {
   target_type = "ip"
 
   health_check {
-    path = "/"
-    # No actuator endpoint in the services yet, so "/" answers 404 from a
-    # healthy Spring app - accept it until a real health endpoint exists.
-    matcher             = "200-404"
+    # api-gateway-service exposes Spring Boot's liveness probe, permitted
+    # without a token for exactly this caller. It answers 200 {"status":"UP"}
+    # only while the app can still serve a request, so a hung or
+    # thread-starved gateway now fails the check.
+    #
+    # This replaces a probe of "/" with matcher 200-404. The enforced
+    # security chain denies "/", so the check passed on a 401 - which a
+    # wedged JVM will happily keep returning. Every task counted as healthy
+    # no matter what state it was in.
+    #
+    # Liveness deliberately excludes the Aurora indicator (see the gateway's
+    # application.yml): tying the ALB check to a shared dependency means one
+    # Aurora blip drains every task at once and ECS replaces them all.
+    path                = "/actuator/health/liveness"
+    matcher             = "200"
     interval            = 30
     healthy_threshold   = 2
     unhealthy_threshold = 5

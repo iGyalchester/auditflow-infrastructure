@@ -59,6 +59,17 @@ environments/
   its leading entry is client-supplied and a caller could rotate it to
   escape the limit or forge someone else's to get them limited.
   `overwrite:` means the value is ours even if the client sent one.
+- **The ALB health check asks whether the task can serve, not whether the
+  database is up.** The target group probes
+  `/actuator/health/liveness` on api-gateway-service and requires a 200. It
+  used to probe `/`, which the enforced security chain denies, so the check
+  had to accept `200-404` and passed on the 401 - meaning a wedged JVM
+  counted as healthy for as long as it could still return a rejection.
+  Liveness deliberately leaves Aurora out: this check is also what ECS uses
+  to decide a task is dead, so wiring a shared dependency into it would let
+  one Aurora blip drain every gateway task at once and trigger a
+  replacement storm. A database outage should degrade responses, not delete
+  the fleet.
 - **Multi-tenancy starts at the identity layer.** Cognito's user pool
   carries a `custom:customer_id` attribute, so it's in the JWT from the
   first login, not bolted on later - matches the plan's "multi-tenant from
