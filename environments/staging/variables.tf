@@ -93,6 +93,20 @@ variable "ecs_desired_count" {
   default = 1
 }
 
+variable "ingestion_tokens_secret_arn" {
+  description = "Secrets Manager secret (plain string) holding AUDIT_INGESTION_TOKENS as \"tenant=token,tenant=token\". Each token may only post events whose customerId is its own tenant."
+  type        = string
+  default     = ""
+
+  # Open ingestion means any source can write events as any customer, which
+  # is a forged audit trail. Tolerable in dev, never here - so the apply
+  # refuses rather than quietly bringing up an open endpoint.
+  validation {
+    condition     = !var.ecs_enabled || var.ingestion_tokens_secret_arn != ""
+    error_message = "ingestion_tokens_secret_arn is required when ecs_enabled is true: an open ingestion endpoint lets any source forge another customer's audit trail."
+  }
+}
+
 variable "alert_slack_webhook_secret_arn" {
   description = "Secrets Manager secret (plain string) holding the Slack incoming-webhook URL for alert notifications. Empty = Slack alerts are logged, not sent."
   type        = string

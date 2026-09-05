@@ -111,6 +111,30 @@ privilege to create the bootstrap resources (only needed once, by a human).
 | Aurora metadata | Rows older than `audit.retention.days` (400 default) purged nightly in batches by enrichment-service. Backups: `backup_retention_period` in `modules/aurora`. | `auditflow-platform` enrichment config |
 | CloudWatch logs | `log_retention_days` (90 default) on the ECS log group. | `modules/ecs` |
 
+## Ingestion tokens (ECS)
+
+Every source that posts audit events presents an `X-Audit-Token`, and each
+token is **bound to the one customer it may write as**. A token that only
+authenticates would prove the caller is *a* known source and then let it
+post events under any `customerId` - a forged audit trail, which is the one
+thing this platform may not permit.
+
+Create the secret by hand as a *plain string* of `tenant=token` pairs, then
+name it per environment in `terraform.tfvars`:
+
+```hcl
+ingestion_tokens_secret_arn = "arn:aws:secretsmanager:...:secret:auditflow/ingestion-tokens-XXXX"
+```
+
+```
+resistance=<random 32+ chars>,acme=<a different random 32+ chars>
+```
+
+Only `ingestion-service` receives it (as `AUDIT_INGESTION_TOKENS`) and only
+the execution role can read it. Leaving it blank means the endpoint accepts
+any `customerId` from anyone who can reach it; that is the dev default and
+**staging and prod refuse to apply with `ecs_enabled = true` without it**.
+
 ## Alert notifications (ECS)
 
 `alerting-service` sends Slack and email alerts once told where. Per
