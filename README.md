@@ -106,6 +106,18 @@ privilege to create the bootstrap resources (only needed once, by a human).
    Actions > Variables), alongside `AWS_REGION` and `TF_STATE_BUCKET`
    (the `state_bucket_name` you chose above).
 
+   Also set `AWS_PLAN_ROLE_ARN` from the `github_actions_plan_role_arn`
+   output. Two roles, on purpose: `AWS_ROLE_ARN` can write to the account
+   and is assumable only from `main` and from an environment-bound job,
+   while `AWS_PLAN_ROLE_ARN` is read-only and is the only one a
+   pull-request workflow can assume. The deploy role's trust policy no
+   longer accepts the `pull_request` subject, so a workflow a PR triggers -
+   including one whose own diff came from that PR - cannot hold write
+   credentials. Note the plan job is deliberately not bound to a GitHub
+   Environment: an environment-bound job presents `environment:<name>` as
+   its OIDC subject instead of `pull_request`, which would defeat the trust
+   policy that makes the plan role safe.
+
    Back up `bootstrap/terraform.tfstate` somewhere durable (it's the one
    piece of state that isn't remote) - losing it just means re-importing
    the state bucket and OIDC role, not losing any data.
