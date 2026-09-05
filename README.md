@@ -50,6 +50,15 @@ environments/
   retention) plus an explicit deny-delete bucket policy as a second,
   independent barrier - matches the plan's "immutable audit logs"
   principle.
+- **The gateway is told the client's address, not asked to guess it.** Two
+  hops (this API, then the internal ALB) sit in front of the services, so
+  the socket address they see is the load balancer and a per-client rate
+  limit would be one global bucket. The HTTP API integration therefore sets
+  `X-Client-IP` from `$context.identity.sourceIp` with an `overwrite:`
+  mapping. Deliberately not `X-Forwarded-For`: every hop appends to it, so
+  its leading entry is client-supplied and a caller could rotate it to
+  escape the limit or forge someone else's to get them limited.
+  `overwrite:` means the value is ours even if the client sent one.
 - **Multi-tenancy starts at the identity layer.** Cognito's user pool
   carries a `custom:customer_id` attribute, so it's in the JWT from the
   first login, not bolted on later - matches the plan's "multi-tenant from

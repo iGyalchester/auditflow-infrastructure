@@ -41,6 +41,22 @@ resource "aws_apigatewayv2_integration" "backend" {
   connection_type        = "VPC_LINK"
   connection_id          = aws_apigatewayv2_vpc_link.backend[0].id
   payload_format_version = "1.0"
+
+  # Tell the gateway who the caller actually is. Two hops sit in front of
+  # it - this API and the internal ALB - so by the time a request reaches
+  # the service the socket address is the load balancer, and every caller
+  # in the world shares one rate-limit bucket.
+  #
+  # X-Forwarded-For is not the answer: every hop appends to it, so its
+  # leading entry is whatever the client sent. A caller could rotate that
+  # value and never be limited, or forge someone else's and have them
+  # limited instead. $context.identity.sourceIp is the address API Gateway
+  # saw, and "overwrite:" replaces any header the client supplied - so this
+  # value is ours, not theirs. api-gateway-service reads it as
+  # audit.rate-limit.client-ip-header in its aws profile.
+  request_parameters = {
+    "overwrite:header.x-client-ip" = "$context.identity.sourceIp"
+  }
 }
 
 resource "aws_apigatewayv2_route" "proxy" {
