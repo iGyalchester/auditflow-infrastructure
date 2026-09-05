@@ -5,8 +5,8 @@
 Terraform for AuditFlow's AWS footprint — companion to the
 **`auditflow-platform`** application repo. Layout: hand-applied
 `bootstrap/` (state bucket with native S3 locking — no DynamoDB — plus a
-GitHub-OIDC deploy role), 11 reusable `modules/`, and `dev` / `staging` /
-`prod` root modules under `environments/`. CI
+GitHub-OIDC deploy role), 13 reusable `modules/`, and a single `stack/`
+root applied once per environment with `environments/<env>.tfvars`. CI
 (`.github/workflows/terraform.yml`): fmt/validate/tfsec + plan on PRs,
 auto-apply **dev only** on push to main; staging/prod apply and all
 destroys are manual `workflow_dispatch` only.
@@ -35,6 +35,12 @@ destroys are manual `workflow_dispatch` only.
 - Multi-tenancy rides in the JWT: Cognito's immutable
   `custom:customer_id` attribute — keep it flowing through the API
   Gateway authorizer and access logs.
+- **The client IP the platform rate-limits on is set here, not by the
+  client.** `modules/api-gateway` maps
+  `"overwrite:header.x-client-ip" = "$context.identity.sourceIp"`. The
+  `overwrite:` prefix is what makes it trustworthy: it replaces any
+  `X-Client-IP` the caller sent. Drop the prefix (or the mapping) and every
+  caller can pick its own rate-limit bucket.
 
 ## Open items (known, tracked in README)
 
@@ -53,7 +59,11 @@ destroys are manual `workflow_dispatch` only.
 - Terraform >= 1.10 required (native S3 lockfile); CI pins 1.13.5.
 - `terraform fmt -check -recursive` gates CI — run `terraform fmt` before
   committing.
-- Environment diffs are tfvars-only by design (dev: 2 AZs, single NAT,
-  0.5–2 ACU, 90-day retention; prod: 3 AZs, per-AZ NAT, 1–16 ACU, 3
-  instances, 7-year retention, deletion protection). Keep new knobs as
-  module variables surfaced through each environment's tfvars.
+- Environment diffs are tfvars-only, now literally: there is one root and
+  one `variables.tf`, and the variables the environments differ on have
+  **no defaults** (dev: 2 AZs, single NAT, 0.5–2 ACU, 90-day retention;
+  prod: 3 AZs, per-AZ NAT, 1–16 ACU, 3 instances, 7-year retention,
+  deletion protection). A forgotten value fails the plan instead of
+  silently inheriting another environment's number — which is what the
+  old per-environment defaults did. Keep new knobs as module variables
+  surfaced through each environment's tfvars.

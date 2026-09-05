@@ -103,10 +103,21 @@ resource "aws_lb_target_group" "api_gateway" {
   target_type = "ip"
 
   health_check {
-    path = "/"
-    # No actuator endpoint in the services yet, so "/" answers 404 from a
-    # healthy Spring app - accept it until a real health endpoint exists.
-    matcher             = "200-404"
+    # api-gateway-service exposes Spring Boot's liveness probe, permitted
+    # without a token for exactly this caller. It answers 200 {"status":"UP"}
+    # only while the app can still serve a request, so a hung or
+    # thread-starved gateway now fails the check.
+    #
+    # This replaces a probe of "/" with matcher 200-404. The enforced
+    # security chain denies "/", so the check passed on a 401 - which a
+    # wedged JVM will happily keep returning. Every task counted as healthy
+    # no matter what state it was in.
+    #
+    # Liveness deliberately excludes the Aurora indicator (see the gateway's
+    # application.yml): tying the ALB check to a shared dependency means one
+    # Aurora blip drains every task at once and ECS replaces them all.
+    path                = "/actuator/health/liveness"
+    matcher             = "200"
     interval            = 30
     healthy_threshold   = 2
     unhealthy_threshold = 5
@@ -157,9 +168,13 @@ resource "aws_iam_role_policy_attachment" "execution_managed" {
 
 data "aws_iam_policy_document" "execution_secrets" {
   statement {
-    effect    = "Allow"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = compact([var.aurora_secret_arn, var.alert_slack_webhook_secret_arn])
+    effect  = "Allow"
+    actions = ["secretsmanager:GetSecretValue"]
+    resources = compact([
+      var.aurora_secret_arn,
+      var.alert_slack_webhook_secret_arn,
+      var.ingestion_tokens_secret_arn,
+    ])
   }
 }
 
@@ -290,6 +305,12 @@ resource "aws_ecs_task_definition" "service" {
         # to the channel), so it comes from Secrets Manager, never plain env.
         each.key == "alerting-service" && var.alert_slack_webhook_secret_arn != "" ? [
           { name = "ALERT_SLACK_WEBHOOK_URL", valueFrom = var.alert_slack_webhook_secret_arn },
+        ] : [],
+        # Only ingestion-service checks these, and only it should be able to
+        # read them: the tokens are what stop one source writing events as
+        # another customer.
+        each.key == "ingestion-service" && var.ingestion_tokens_secret_arn != "" ? [
+          { name = "AUDIT_INGESTION_TOKENS", valueFrom = var.ingestion_tokens_secret_arn },
         ] : []
       )
       logConfiguration = {

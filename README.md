@@ -21,8 +21,12 @@ modules/
   ecr/                 One image repository per platform service (scan-on-push, lifecycle-pruned).
   ecs/                 Fargate services for auditflow-platform, internal ALB in front of api-gateway-service.
   monitoring/          SNS alert topic, Aurora CPU alarms, API Gateway 5xx alarm.
+stack/                The single root composing the modules above. Applied once per
+                      environment, with a different tfvars file and a different state
+                      key, chosen by -var environment=<env>.
 environments/
-  dev/, staging/, prod/  Root modules composing the above, one per environment.
+  <env>.tfvars         Every value the environments differ on, set explicitly.
+  <env>.backend.hcl.example
 .github/workflows/terraform.yml   fmt/validate/tfsec on PRs, plan on PRs, apply on merge to main.
 ```
 
@@ -50,6 +54,26 @@ environments/
   retention) plus an explicit deny-delete bucket policy as a second,
   independent barrier - matches the plan's "immutable audit logs"
   principle.
+- **The gateway is told the client's address, not asked to guess it.** Two
+  hops (this API, then the internal ALB) sit in front of the services, so
+  the socket address they see is the load balancer and a per-client rate
+  limit would be one global bucket. The HTTP API integration therefore sets
+  `X-Client-IP` from `$context.identity.sourceIp` with an `overwrite:`
+  mapping. Deliberately not `X-Forwarded-For`: every hop appends to it, so
+  its leading entry is client-supplied and a caller could rotate it to
+  escape the limit or forge someone else's to get them limited.
+  `overwrite:` means the value is ours even if the client sent one.
+- **The ALB health check asks whether the task can serve, not whether the
+  database is up.** The target group probes
+  `/actuator/health/liveness` on api-gateway-service and requires a 200. It
+  used to probe `/`, which the enforced security chain denies, so the check
+  had to accept `200-404` and passed on the 401 - meaning a wedged JVM
+  counted as healthy for as long as it could still return a rejection.
+  Liveness deliberately leaves Aurora out: this check is also what ECS uses
+  to decide a task is dead, so wiring a shared dependency into it would let
+  one Aurora blip drain every gateway task at once and trigger a
+  replacement storm. A database outage should degrade responses, not delete
+  the fleet.
 - **Multi-tenancy starts at the identity layer.** Cognito's user pool
   carries a `custom:customer_id` attribute, so it's in the JWT from the
   first login, not bolted on later - matches the plan's "multi-tenant from
@@ -93,14 +117,22 @@ privilege to create the bootstrap resources (only needed once, by a human).
 2. **Per environment** (`dev`, `staging`, or `prod`):
 
    ```bash
-   cd environments/dev
-   cp backend.hcl.example backend.hcl   # fill in the bucket name from step 1
+   cd stack
+   cp ../environments/dev.backend.hcl.example backend.hcl   # bucket from step 1
+   # Edit ../environments/dev.tfvars: evidence_bucket_name and
+   # cognito_domain_prefix must be globally unique - the "changeme"
+   # placeholders will fail to apply.
+   export TF_DATA_DIR=.terraform-dev
    terraform init -backend-config=backend.hcl
-   # Edit terraform.tfvars: evidence_bucket_name and cognito_domain_prefix
-   # must be globally unique - the "changeme" placeholders will fail to apply.
-   terraform plan -var-file=terraform.tfvars
-   terraform apply -var-file=terraform.tfvars
+   terraform plan  -var-file=../environments/dev.tfvars -var environment=dev
+   terraform apply -var-file=../environments/dev.tfvars -var environment=dev
    ```
+
+   `TF_DATA_DIR` is what keeps several environments initialised side by side
+   out of one directory: each gets its own `.terraform-<env>` holding its own
+   backend state key. Without it, switching environment means
+   `init -reconfigure` each time - which is what CI does, since it starts
+   from a clean checkout per job.
 
 ## Retention, per store
 
@@ -110,6 +142,30 @@ privilege to create the bootstrap resources (only needed once, by a human).
 | Kafka topics | `retention.ms` = 7 days, declared by the producing service on startup (MSK Serverless retention is per topic). | `auditflow-platform` ingestion/enrichment config |
 | Aurora metadata | Rows older than `audit.retention.days` (400 default) purged nightly in batches by enrichment-service. Backups: `backup_retention_period` in `modules/aurora`. | `auditflow-platform` enrichment config |
 | CloudWatch logs | `log_retention_days` (90 default) on the ECS log group. | `modules/ecs` |
+
+## Ingestion tokens (ECS)
+
+Every source that posts audit events presents an `X-Audit-Token`, and each
+token is **bound to the one customer it may write as**. A token that only
+authenticates would prove the caller is *a* known source and then let it
+post events under any `customerId` - a forged audit trail, which is the one
+thing this platform may not permit.
+
+Create the secret by hand as a *plain string* of `tenant=token` pairs, then
+name it per environment in `terraform.tfvars`:
+
+```hcl
+ingestion_tokens_secret_arn = "arn:aws:secretsmanager:...:secret:auditflow/ingestion-tokens-XXXX"
+```
+
+```
+resistance=<random 32+ chars>,acme=<a different random 32+ chars>
+```
+
+Only `ingestion-service` receives it (as `AUDIT_INGESTION_TOKENS`) and only
+the execution role can read it. Leaving it blank means the endpoint accepts
+any `customerId` from anyone who can reach it; that is the dev default and
+**staging and prod refuse to apply with `ecs_enabled = true` without it**.
 
 ## Alert notifications (ECS)
 
