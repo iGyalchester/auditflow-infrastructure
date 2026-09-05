@@ -110,6 +110,17 @@ privilege to create the bootstrap resources (only needed once, by a human).
    piece of state that isn't remote) - losing it just means re-importing
    the state bucket and OIDC role, not losing any data.
 
+   **This bootstrap owns the GitHub OIDC provider** for the account
+   (`create_oidc_provider` defaults to true). The provider's URL is its
+   identity and AWS allows exactly one per account, so the Resistance
+   repo's bootstrap reads this one rather than creating its own - it
+   defaults `create_oidc_provider` to false. Apply both with `true` and
+   whichever runs second fails with `EntityAlreadyExists`. If you ever move
+   ownership the other way, flip both flags together; never leave both
+   true, and never leave both false (the trust policy would have no
+   provider to name, and `coalesce` fails loudly rather than producing an
+   empty ARN).
+
 2. **Per environment** (`dev`, `staging`, or `prod`):
 
    ```bash
