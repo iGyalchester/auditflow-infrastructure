@@ -157,9 +157,13 @@ resource "aws_iam_role_policy_attachment" "execution_managed" {
 
 data "aws_iam_policy_document" "execution_secrets" {
   statement {
-    effect    = "Allow"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = compact([var.aurora_secret_arn, var.alert_slack_webhook_secret_arn])
+    effect  = "Allow"
+    actions = ["secretsmanager:GetSecretValue"]
+    resources = compact([
+      var.aurora_secret_arn,
+      var.alert_slack_webhook_secret_arn,
+      var.ingestion_tokens_secret_arn,
+    ])
   }
 }
 
@@ -290,6 +294,12 @@ resource "aws_ecs_task_definition" "service" {
         # to the channel), so it comes from Secrets Manager, never plain env.
         each.key == "alerting-service" && var.alert_slack_webhook_secret_arn != "" ? [
           { name = "ALERT_SLACK_WEBHOOK_URL", valueFrom = var.alert_slack_webhook_secret_arn },
+        ] : [],
+        # Only ingestion-service checks these, and only it should be able to
+        # read them: the tokens are what stop one source writing events as
+        # another customer.
+        each.key == "ingestion-service" && var.ingestion_tokens_secret_arn != "" ? [
+          { name = "AUDIT_INGESTION_TOKENS", valueFrom = var.ingestion_tokens_secret_arn },
         ] : []
       )
       logConfiguration = {

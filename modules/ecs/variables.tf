@@ -100,6 +100,12 @@ variable "cognito_client_id" {
   type        = string
 }
 
+variable "ingestion_tokens_secret_arn" {
+  description = "Secrets Manager secret holding ingestion-service's AUDIT_INGESTION_TOKENS: a plain string of \"tenant=token,tenant=token\". Each token may only post events whose customerId is its own tenant. Empty = the endpoint is OPEN and any source can write as any customer, which is only ever acceptable in dev."
+  type        = string
+  default     = ""
+}
+
 variable "alert_slack_webhook_secret_arn" {
   description = "Secrets Manager secret holding the Slack incoming-webhook URL for alerting-service (plain string secret). Empty = Slack notifier logs only."
   type        = string

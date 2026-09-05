@@ -95,6 +95,12 @@ variable "ecs_desired_count" {
   default = 1
 }
 
+variable "ingestion_tokens_secret_arn" {
+  description = "Secrets Manager secret (plain string) holding AUDIT_INGESTION_TOKENS as \"tenant=token,tenant=token\". Each token may only post events whose customerId is its own tenant. Empty = the ingestion endpoint is open to any customerId."
+  type        = string
+  default     = ""
+}
+
 variable "alert_slack_webhook_secret_arn" {
   description = "Secrets Manager secret (plain string) holding the Slack incoming-webhook URL for alert notifications. Empty = Slack alerts are logged, not sent."
   type        = string
