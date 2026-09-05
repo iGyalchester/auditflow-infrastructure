@@ -78,7 +78,10 @@ jobs:
     name: plan (${{ matrix.environment }})
     runs-on: ubuntu-latest
     needs: [fmt-and-validate]
-    if: github.event_name == 'pull_request'
+    # Skips itself until AWS_PLAN_ROLE_ARN is set, rather than failing on
+    # empty credentials. Deliberately not falling back to AWS_ROLE_ARN: an
+    # unset variable should mean "no plan", never "plan with write access".
+    if: github.event_name == 'pull_request' && vars.AWS_PLAN_ROLE_ARN != ''
     strategy:
       matrix:
         environment: [dev, staging, prod]
