@@ -1,13 +1,21 @@
+# One root for every environment. dev, staging and prod were identical
+# apart from this literal, and each carried its own copy of the variable
+# declarations - with the *defaults* differing per environment, so the same
+# variable name meant different things in three files. Every tfvars already
+# set each of those values explicitly, so the defaults were dead weight that
+# only mattered when someone forgot one.
+#
+# State keys are unchanged (<env>/terraform.tfstate): a layout change, not a
+# state migration.
 locals {
-  environment = "dev"
-  name        = "auditflow-${local.environment}"
+  name = "auditflow-${var.environment}"
   tags = {
-    Environment = local.environment
+    Environment = var.environment
   }
 }
 
 module "network" {
-  source = "../../modules/network"
+  source = "../modules/network"
 
   name               = local.name
   vpc_cidr           = var.vpc_cidr
@@ -17,14 +25,14 @@ module "network" {
 }
 
 module "kms" {
-  source = "../../modules/kms"
+  source = "../modules/kms"
 
   name = local.name
   tags = local.tags
 }
 
 module "s3_evidence" {
-  source = "../../modules/s3"
+  source = "../modules/s3"
 
   bucket_name                = var.evidence_bucket_name
   kms_key_arn                = module.kms.key_arn
@@ -33,7 +41,7 @@ module "s3_evidence" {
 }
 
 module "msk" {
-  source = "../../modules/msk"
+  source = "../modules/msk"
 
   name               = local.name
   vpc_id             = module.network.vpc_id
@@ -43,7 +51,7 @@ module "msk" {
 }
 
 module "aurora" {
-  source = "../../modules/aurora"
+  source = "../modules/aurora"
 
   name                = local.name
   vpc_id              = module.network.vpc_id
@@ -59,7 +67,7 @@ module "aurora" {
 }
 
 module "glue" {
-  source = "../../modules/glue"
+  source = "../modules/glue"
 
   name                 = local.name
   evidence_bucket_name = module.s3_evidence.bucket_name
@@ -68,7 +76,7 @@ module "glue" {
 }
 
 module "athena" {
-  source = "../../modules/athena"
+  source = "../modules/athena"
 
   name        = local.name
   kms_key_arn = module.kms.key_arn
@@ -76,7 +84,7 @@ module "athena" {
 }
 
 module "emr" {
-  source = "../../modules/emr"
+  source = "../modules/emr"
 
   name                 = local.name
   vpc_id               = module.network.vpc_id
@@ -88,7 +96,7 @@ module "emr" {
 }
 
 module "cognito" {
-  source = "../../modules/cognito"
+  source = "../modules/cognito"
 
   name          = local.name
   domain_prefix = var.cognito_domain_prefix
@@ -98,7 +106,7 @@ module "cognito" {
 }
 
 module "api_gateway" {
-  source = "../../modules/api-gateway"
+  source = "../modules/api-gateway"
 
   name                 = local.name
   aws_region           = var.aws_region
@@ -114,7 +122,7 @@ module "api_gateway" {
 }
 
 module "monitoring" {
-  source = "../../modules/monitoring"
+  source = "../modules/monitoring"
 
   name                        = local.name
   alert_email                 = var.alert_email
@@ -125,7 +133,7 @@ module "monitoring" {
 
 
 module "ecr" {
-  source = "../../modules/ecr"
+  source = "../modules/ecr"
 
   name = local.name
   tags = local.tags
@@ -135,7 +143,7 @@ module "ecr" {
 # THEN flip ecs_enabled - otherwise every task crash-loops pulling from an
 # empty registry while the ALB and Fargate bill by the hour.
 module "ecs" {
-  source = "../../modules/ecs"
+  source = "../modules/ecs"
   count  = var.ecs_enabled ? 1 : 0
 
   name                    = local.name

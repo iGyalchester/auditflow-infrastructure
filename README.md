@@ -21,8 +21,12 @@ modules/
   ecr/                 One image repository per platform service (scan-on-push, lifecycle-pruned).
   ecs/                 Fargate services for auditflow-platform, internal ALB in front of api-gateway-service.
   monitoring/          SNS alert topic, Aurora CPU alarms, API Gateway 5xx alarm.
+stack/                The single root composing the modules above. Applied once per
+                      environment, with a different tfvars file and a different state
+                      key, chosen by -var environment=<env>.
 environments/
-  dev/, staging/, prod/  Root modules composing the above, one per environment.
+  <env>.tfvars         Every value the environments differ on, set explicitly.
+  <env>.backend.hcl.example
 .github/workflows/terraform.yml   fmt/validate/tfsec on PRs, plan on PRs, apply on merge to main.
 ```
 
@@ -113,14 +117,22 @@ privilege to create the bootstrap resources (only needed once, by a human).
 2. **Per environment** (`dev`, `staging`, or `prod`):
 
    ```bash
-   cd environments/dev
-   cp backend.hcl.example backend.hcl   # fill in the bucket name from step 1
+   cd stack
+   cp ../environments/dev.backend.hcl.example backend.hcl   # bucket from step 1
+   # Edit ../environments/dev.tfvars: evidence_bucket_name and
+   # cognito_domain_prefix must be globally unique - the "changeme"
+   # placeholders will fail to apply.
+   export TF_DATA_DIR=.terraform-dev
    terraform init -backend-config=backend.hcl
-   # Edit terraform.tfvars: evidence_bucket_name and cognito_domain_prefix
-   # must be globally unique - the "changeme" placeholders will fail to apply.
-   terraform plan -var-file=terraform.tfvars
-   terraform apply -var-file=terraform.tfvars
+   terraform plan  -var-file=../environments/dev.tfvars -var environment=dev
+   terraform apply -var-file=../environments/dev.tfvars -var environment=dev
    ```
+
+   `TF_DATA_DIR` is what keeps several environments initialised side by side
+   out of one directory: each gets its own `.terraform-<env>` holding its own
+   backend state key. Without it, switching environment means
+   `init -reconfigure` each time - which is what CI does, since it starts
+   from a clean checkout per job.
 
 ## Retention, per store
 

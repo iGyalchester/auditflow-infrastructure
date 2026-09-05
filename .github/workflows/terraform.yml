@@ -2,10 +2,10 @@ name: Terraform
 
 on:
   pull_request:
-    paths: ["environments/**", "modules/**", "bootstrap/**"]
+    paths: ["environments/**", "stack/**", "modules/**", "bootstrap/**"]
   push:
     branches: [main]
-    paths: ["environments/**", "modules/**"]
+    paths: ["environments/**", "stack/**", "modules/**"]
   # Staging and prod are never applied automatically - only via this manual
   # trigger (Actions tab > Terraform > Run workflow). Environment protection
   # rules would be the nicer gate, but they require a paid plan on private
@@ -31,11 +31,11 @@ env:
 
 jobs:
   fmt-and-validate:
-    name: fmt & validate (${{ matrix.environment }})
+    name: fmt & validate (${{ matrix.root }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [dev, staging, prod]
+        root: [bootstrap, stack]
     steps:
       - uses: actions/checkout@v4
 
@@ -47,11 +47,11 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: terraform init (no backend - syntax/validate only)
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: ${{ matrix.root }}
         run: terraform init -backend=false
 
       - name: terraform validate
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: ${{ matrix.root }}
         run: terraform validate
 
   security-scan:
@@ -87,7 +87,7 @@ jobs:
       - name: Write backend config
         # backend.hcl is gitignored (account/fork-specific) - generated here
         # from the TF_STATE_BUCKET repo variable set after bootstrap/ is applied.
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: stack
         run: |
           cat > backend.hcl <<EOF
           bucket       = "${{ vars.TF_STATE_BUCKET }}"
@@ -98,12 +98,17 @@ jobs:
           EOF
 
       - name: terraform init
-        working-directory: environments/${{ matrix.environment }}
-        run: terraform init -backend-config=backend.hcl
+        working-directory: stack
+        # -reconfigure: one directory serves every environment, so without
+        # it Terraform offers to migrate the previous state key into this one.
+        run: terraform init -backend-config=backend.hcl -reconfigure
 
       - name: terraform plan
-        working-directory: environments/${{ matrix.environment }}
-        run: terraform plan -var-file=terraform.tfvars -input=false
+        working-directory: stack
+        run: |
+          terraform plan -input=false \
+            -var-file=../environments/${{ matrix.environment }}.tfvars \
+            -var environment=${{ matrix.environment }}
 
   apply:
     name: apply (${{ matrix.environment }})
@@ -132,7 +137,7 @@ jobs:
       - name: Write backend config
         # backend.hcl is gitignored (account/fork-specific) - generated here
         # from the TF_STATE_BUCKET repo variable set after bootstrap/ is applied.
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: stack
         run: |
           cat > backend.hcl <<EOF
           bucket       = "${{ vars.TF_STATE_BUCKET }}"
@@ -143,9 +148,14 @@ jobs:
           EOF
 
       - name: terraform init
-        working-directory: environments/${{ matrix.environment }}
-        run: terraform init -backend-config=backend.hcl
+        working-directory: stack
+        # -reconfigure: one directory serves every environment, so without
+        # it Terraform offers to migrate the previous state key into this one.
+        run: terraform init -backend-config=backend.hcl -reconfigure
 
       - name: terraform apply
-        working-directory: environments/${{ matrix.environment }}
-        run: terraform apply -var-file=terraform.tfvars -input=false -auto-approve
+        working-directory: stack
+        run: |
+          terraform apply -input=false -auto-approve \
+            -var-file=../environments/${{ matrix.environment }}.tfvars \
+            -var environment=${{ matrix.environment }}
