@@ -130,3 +130,25 @@ variable "alert_email_to" {
   type        = string
   default     = ""
 }
+
+# --- the console's custom domain -------------------------------------------
+#
+# PLACEHOLDER, pending the registrar/DNS decision for areyouinquazzy.lol:
+# which account and repo host the zone. If Resistance's bootstrap creates
+# the apex zone in Route 53, set hosted_zone_name and this stack reads it
+# by name (the same "one creates, the other reads" rule as the OIDC
+# provider). If the apex stays at the registrar's DNS, leave
+# hosted_zone_name empty and create the two CNAMEs the stack outputs.
+# Until console_domain is set nothing is created.
+
+variable "console_domain" {
+  description = "Custom domain for the console, e.g. auditflow.areyouinquazzy.lol. Empty = not configured."
+  type        = string
+  default     = ""
+}
+
+variable "hosted_zone_name" {
+  description = "Public Route 53 zone holding console_domain, when this account hosts it. Empty = zone elsewhere."
+  type        = string
+  default     = ""
+}

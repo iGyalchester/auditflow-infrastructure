@@ -146,6 +146,25 @@ privilege to create the bootstrap resources (only needed once, by a human).
    `init -reconfigure` each time - which is what CI does, since it starts
    from a clean checkout per job.
 
+## The console's domain
+
+The console (served by api-gateway-service, see the platform repo) is
+reached through the HTTP API. `console_domain` in a tfvars file adds an
+ACM certificate (DNS-validated), an API Gateway custom domain name mapped
+onto the `$default` stage, and, when `hosted_zone_name` names a public
+Route 53 zone in this account, the validation records and an alias A
+record. With the zone elsewhere (the apex left at the registrar), apply
+once, create the two records from the `console_certificate_validation_records`
+and `console_domain_target` outputs by hand, and apply again; ACM waits
+for the first, the name resolves once the second is in. Nothing is
+created while `console_domain` is empty. Cognito's callback and logout
+URLs for the same name are in the tfvars already.
+
+**Open**: which account hosts the `areyouinquazzy.lol` zone. If
+Resistance's bootstrap creates it, set `hosted_zone_name` here and the
+stack reads it by name, the same "one creates, the other reads" rule as
+the OIDC provider.
+
 ## Retention, per store
 
 | Store | Policy | Where it lives |

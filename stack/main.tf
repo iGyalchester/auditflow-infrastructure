@@ -118,6 +118,9 @@ module "api_gateway" {
   vpc_link_subnet_ids         = module.network.private_subnet_ids
   vpc_link_security_group_ids = module.ecs[*].alb_security_group_id
 
+  console_domain   = var.console_domain
+  hosted_zone_name = var.hosted_zone_name
+
   tags = local.tags
 }
 

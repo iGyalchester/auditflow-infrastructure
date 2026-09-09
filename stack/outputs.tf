@@ -50,3 +50,11 @@ output "emr_application_id" {
 output "ecr_repository_urls" {
   value = module.ecr.repository_urls
 }
+
+output "console_domain_target" {
+  value = module.api_gateway.console_domain_target
+}
+
+output "console_certificate_validation_records" {
+  value = module.api_gateway.console_certificate_validation_records
+}

@@ -47,3 +47,15 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "console_domain" {
+  description = "Custom domain for the console and API, e.g. auditflow.areyouinquazzy.lol. Empty = no certificate, no domain name, no DNS: the execute-api URL stays the only entry."
+  type        = string
+  default     = ""
+}
+
+variable "hosted_zone_name" {
+  description = "Public Route 53 zone that holds console_domain (e.g. areyouinquazzy.lol), when this account hosts it. Empty = the zone lives elsewhere; the outputs then say which CNAMEs to create by hand."
+  type        = string
+  default     = ""
+}
