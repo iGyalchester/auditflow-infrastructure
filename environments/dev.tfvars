@@ -25,8 +25,11 @@ aurora_skip_final_snapshot = true
 
 emr_max_concurrent_vcpus = 16
 
-cognito_callback_urls = ["http://localhost:5173/callback"]
-cognito_logout_urls   = ["http://localhost:5173/"]
+# The Vite dev server, and the console's home once the custom domain
+# exists (the domain itself is a later PR; listing the URL here costs
+# nothing and means no pool change when it does).
+cognito_callback_urls = ["http://localhost:5173/callback", "https://auditflow.areyouinquazzy.lol/callback"]
+cognito_logout_urls   = ["http://localhost:5173/", "https://auditflow.areyouinquazzy.lol/"]
 
 alert_email = null
 

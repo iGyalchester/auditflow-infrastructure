@@ -22,8 +22,8 @@ resource "aws_apigatewayv2_authorizer" "cognito" {
 # plain bool, so count is known at plan time even while the ECS module's
 # outputs are not). While disabled the API, authorizer, and stage still
 # exist so the endpoint/issuer wiring is stable, but every request 404s.
-# api-gateway-service's own JwtAuthFilter (app repo) stays as defense in
-# depth behind the JWT authorizer here.
+# api-gateway-service's own token verification (SecurityConfig in the app
+# repo) stays as defense in depth behind the JWT authorizer here.
 resource "aws_apigatewayv2_vpc_link" "backend" {
   count              = var.enable_backend_integration ? 1 : 0
   name               = var.name
@@ -59,13 +59,41 @@ resource "aws_apigatewayv2_integration" "backend" {
   }
 }
 
-resource "aws_apigatewayv2_route" "proxy" {
+# Two routes, one integration. The API keeps the JWT authorizer: no
+# token, no request reaches the service. Everything else - the console's
+# HTML and JavaScript, and a reload of a client-side route such as
+# /alerts - passes without one, because the browser has no token before it
+# has loaded the page that signs it in, and the page itself holds no data.
+# The service serves those paths from its jar and still requires a token
+# on /api/** (defense in depth), and it denies anything that is neither
+# the console nor the API, so the open route exposes nothing new.
+# HTTP API routing picks the most specific match, so /api/... always
+# lands on the JWT route even though /{proxy+} would also match it.
+resource "aws_apigatewayv2_route" "api" {
+  count              = var.enable_backend_integration ? 1 : 0
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "ANY /api/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.backend[0].id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "console" {
   count              = var.enable_backend_integration ? 1 : 0
   api_id             = aws_apigatewayv2_api.this.id
   route_key          = "ANY /{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.backend[0].id}"
-  authorization_type = "JWT"
-  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+  authorization_type = "NONE"
+}
+
+# "/" itself is not covered by /{proxy+} (the greedy variable needs at
+# least one character), and it is the URL people type.
+resource "aws_apigatewayv2_route" "root" {
+  count              = var.enable_backend_integration ? 1 : 0
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "GET /"
+  target             = "integrations/${aws_apigatewayv2_integration.backend[0].id}"
+  authorization_type = "NONE"
 }
 
 resource "aws_cloudwatch_log_group" "access_logs" {

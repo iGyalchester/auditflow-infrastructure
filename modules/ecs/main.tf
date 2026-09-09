@@ -289,6 +289,9 @@ resource "aws_ecs_task_definition" "service" {
         # enforcement on, these tell it which pool and app client to trust.
         { name = "COGNITO_ISSUER_URI", value = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${var.cognito_user_pool_id}" },
         { name = "COGNITO_CLIENT_ID", value = var.cognito_client_id },
+        # Published to the console (GET /config.json) so it can sign the
+        # browser out; the gateway does not verify anything with it.
+        { name = "COGNITO_HOSTED_UI_DOMAIN", value = var.cognito_hosted_ui_url },
         ],
         # alerting-service notifier destinations. Blank = that notifier
         # logs instead of sending (the service's own dev default).

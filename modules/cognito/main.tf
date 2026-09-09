@@ -42,6 +42,19 @@ resource "aws_cognito_user_pool" "this" {
   tags = var.tags
 }
 
+# Platform operators: the console shows them every customer and lets
+# them act as one. Membership lands in the ID token as cognito:groups,
+# which api-gateway-service maps to ROLE_OPERATOR; nothing else about a
+# user changes. Add people with `aws cognito-idp admin-add-user-to-group`;
+# there is deliberately no Terraform-managed member list, because who is
+# an operator is an operational decision, not infrastructure.
+resource "aws_cognito_user_group" "operators" {
+  name         = "operators"
+  user_pool_id = aws_cognito_user_pool.this.id
+  description  = "Platform operators: the console's cross-customer view and act-as."
+  precedence   = 1
+}
+
 resource "aws_cognito_user_pool_domain" "this" {
   domain       = var.domain_prefix
   user_pool_id = aws_cognito_user_pool.this.id
@@ -89,3 +102,5 @@ resource "aws_cognito_user_pool_client" "web" {
 
   depends_on = [aws_cognito_resource_server.api]
 }
+
+data "aws_region" "current" {}

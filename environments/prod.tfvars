@@ -25,8 +25,8 @@ aurora_skip_final_snapshot = false
 
 emr_max_concurrent_vcpus = 64
 
-cognito_callback_urls = ["https://app.auditflow.example.com/callback"]
-cognito_logout_urls   = ["https://app.auditflow.example.com/"]
+cognito_callback_urls = ["https://auditflow.areyouinquazzy.lol/callback"]
+cognito_logout_urls   = ["https://auditflow.areyouinquazzy.lol/"]
 
 # Required in prod - SNS sends a subscription-confirmation email on first apply.
 alert_email = "borisgerard333@gmail.com"
