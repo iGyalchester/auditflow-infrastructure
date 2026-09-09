@@ -1,3 +1,11 @@
+# Applied against ../stack with -var-file. The environment itself is passed
+# separately (-var environment=staging), because it also chooses the state
+# key and CI needs it before reading this file.
+#
+# Every value the environments differ on is set here explicitly. The root
+# deliberately has no defaults for them: a forgotten value should fail the
+# plan, not silently inherit another environment's number.
+
 aws_region = "us-east-1"
 azs        = ["us-east-1a", "us-east-1b"]
 vpc_cidr   = "10.20.0.0/16"
