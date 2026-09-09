@@ -11,3 +11,7 @@ output "github_actions_role_arn" {
   description = "Role ARN for the GitHub Actions workflow to assume via OIDC."
   value       = aws_iam_role.github_actions_deploy.arn
 }
+output "github_actions_plan_role_arn" {
+  description = "Set as the AWS_PLAN_ROLE_ARN repository variable. Pull-request plans assume this instead of the deploy role."
+  value       = aws_iam_role.github_actions_plan.arn
+}
