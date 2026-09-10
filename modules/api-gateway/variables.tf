@@ -38,6 +38,18 @@ variable "vpc_link_security_group_ids" {
   default     = []
 }
 
+variable "throttling_rate_limit" {
+  description = "Stage-wide steady-state requests per second across every route (the service limiter is per client on /api/ only)."
+  type        = number
+  default     = 100
+}
+
+variable "throttling_burst_limit" {
+  description = "Stage-wide burst across every route."
+  type        = number
+  default     = 200
+}
+
 variable "log_retention_days" {
   type    = number
   default = 90
