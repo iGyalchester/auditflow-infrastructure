@@ -4,14 +4,20 @@
 #
 # Three pieces: an ACM certificate validated by DNS, the API's custom
 # domain name mapped onto the $default stage, and the DNS record that
-# points the name at API Gateway's regional endpoint. The record is only
-# written when the zone is in Route 53 (hosted_zone_name set); with the
-# apex left at the registrar's DNS, the two outputs below are what to
-# paste there (a CNAME for the domain, and the validation CNAME for the
-# certificate), and Terraform waits for validation the same way.
+# points the name at API Gateway's regional endpoint. With the zone in
+# Route 53 (hosted_zone_name set) all of it is one apply. With the apex
+# left at the registrar's DNS it is two, and the second half is gated on
+# console_certificate_ready so the first apply *finishes*: ACM cannot
+# issue until the validation CNAME exists, and that CNAME is only known
+# from this stack's outputs after the certificate is created. Apply once
+# (certificate only, outputs the record), create it at the registrar,
+# set console_certificate_ready = true, apply again (validation returns
+# at once, the domain name and mapping follow), then create the console
+# CNAME from console_domain_target.
 locals {
   domain_enabled = var.console_domain != ""
   zone_enabled   = local.domain_enabled && var.hosted_zone_name != ""
+  domain_ready   = local.zone_enabled || (local.domain_enabled && var.console_certificate_ready)
 }
 
 data "aws_route53_zone" "console" {
@@ -48,17 +54,14 @@ resource "aws_route53_record" "console_validation" {
   allow_overwrite = true
 }
 
-# With the zone elsewhere, validation still has to complete before the
-# domain name can use the certificate: apply once to get the validation
-# CNAME from the output, create it at the registrar, and apply again.
 resource "aws_acm_certificate_validation" "console" {
-  count                   = local.domain_enabled ? 1 : 0
+  count                   = local.domain_ready ? 1 : 0
   certificate_arn         = aws_acm_certificate.console[0].arn
   validation_record_fqdns = local.zone_enabled ? [for r in aws_route53_record.console_validation : r.fqdn] : null
 }
 
 resource "aws_apigatewayv2_domain_name" "console" {
-  count       = local.domain_enabled ? 1 : 0
+  count       = local.domain_ready ? 1 : 0
   domain_name = var.console_domain
   tags        = var.tags
 
@@ -70,7 +73,7 @@ resource "aws_apigatewayv2_domain_name" "console" {
 }
 
 resource "aws_apigatewayv2_api_mapping" "console" {
-  count       = local.domain_enabled ? 1 : 0
+  count       = local.domain_ready ? 1 : 0
   api_id      = aws_apigatewayv2_api.this.id
   domain_name = aws_apigatewayv2_domain_name.console[0].id
   stage       = aws_apigatewayv2_stage.default.id

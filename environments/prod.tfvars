@@ -27,9 +27,11 @@ emr_max_concurrent_vcpus = 64
 
 # The console's custom domain. hosted_zone_name stays empty until the
 # registrar/DNS question is settled (see stack/variables.tf); with it
-# empty the stack outputs the CNAMEs to create by hand.
-console_domain   = "auditflow.areyouinquazzy.lol"
-hosted_zone_name = ""
+# empty the stack outputs the validation CNAME to create by hand, and
+# console_certificate_ready flips to true for the second apply.
+console_domain            = "auditflow.areyouinquazzy.lol"
+hosted_zone_name          = ""
+console_certificate_ready = false
 
 cognito_callback_urls = ["https://auditflow.areyouinquazzy.lol/callback"]
 cognito_logout_urls   = ["https://auditflow.areyouinquazzy.lol/"]

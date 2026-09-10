@@ -71,3 +71,9 @@ variable "hosted_zone_name" {
   type        = string
   default     = ""
 }
+
+variable "console_certificate_ready" {
+  description = "Zone elsewhere only: set to true once the certificate's validation CNAME (from the outputs) exists at the registrar, so the second apply can validate and create the domain name. Ignored when hosted_zone_name is set."
+  type        = bool
+  default     = false
+}

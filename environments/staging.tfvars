@@ -25,6 +25,12 @@ aurora_skip_final_snapshot = false
 
 emr_max_concurrent_vcpus = 32
 
+# No custom domain here; the console is reached at the execute-api URL
+# (see README, "The console's domain").
+console_domain            = ""
+hosted_zone_name          = ""
+console_certificate_ready = false
+
 cognito_callback_urls = ["https://staging.auditflow.example.com/callback"]
 cognito_logout_urls   = ["https://staging.auditflow.example.com/"]
 

@@ -154,12 +154,21 @@ reached through the HTTP API. `console_domain` in a tfvars file adds an
 ACM certificate (DNS-validated), an API Gateway custom domain name mapped
 onto the `$default` stage, and, when `hosted_zone_name` names a public
 Route 53 zone in this account, the validation records and an alias A
-record. With the zone elsewhere (the apex left at the registrar), apply
-once, create the two records from the `console_certificate_validation_records`
-and `console_domain_target` outputs by hand, and apply again; ACM waits
-for the first, the name resolves once the second is in. Nothing is
-created while `console_domain` is empty. Cognito's callback and logout
-URLs for the same name are in the tfvars already.
+record. With the zone elsewhere (the apex left at the registrar) it is
+two applies, and the second half is gated so the first one finishes:
+apply once (the certificate alone; `console_certificate_validation_records`
+prints the CNAME ACM needs), create that record at the registrar, set
+`console_certificate_ready = true`, apply again (validation returns at
+once, the domain name and stage mapping follow), then point the console
+name at `console_domain_target` with a CNAME. Nothing is created while
+`console_domain` is empty. Every environment states all three knobs in
+its tfvars (no defaults at the root, like every knob the environments
+differ on). Until the name resolves, the console is reached at the API's
+execute-api URL, and that origin must be added to the environment's
+`cognito_callback_urls`/`cognito_logout_urls` after the first apply (the
+pool cannot reference the API's URL in Terraform without a cycle);
+remove it again once the domain is live. Cognito's callback and logout
+URLs for the custom name are in prod's tfvars already.
 
 **Open**: which account hosts the `areyouinquazzy.lol` zone. If
 Resistance's bootstrap creates it, set `hosted_zone_name` here and the

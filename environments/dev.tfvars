@@ -31,6 +31,12 @@ emr_max_concurrent_vcpus = 16
 # add that origin here after the first apply (README, "The console's
 # domain") - the pool cannot reference the API's URL in Terraform without
 # a cycle.
+# No custom domain here; the console is reached at the execute-api URL
+# (see README, "The console's domain").
+console_domain            = ""
+hosted_zone_name          = ""
+console_certificate_ready = false
+
 cognito_callback_urls = ["http://localhost:5173/callback"]
 cognito_logout_urls   = ["http://localhost:5173/"]
 
