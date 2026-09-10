@@ -59,16 +59,27 @@ resource "aws_apigatewayv2_integration" "backend" {
   }
 }
 
-# Two routes, one integration. The API keeps the JWT authorizer: no
-# token, no request reaches the service. Everything else - the console's
-# HTML and JavaScript, and a reload of a client-side route such as
-# /alerts - passes without one, because the browser has no token before it
-# has loaded the page that signs it in, and the page itself holds no data.
-# The service serves those paths from its jar and still requires a token
-# on /api/** (defense in depth), and it denies anything that is neither
-# the console nor the API, so the open route exposes nothing new.
-# HTTP API routing picks the most specific match, so /api/... always
-# lands on the JWT route even though /{proxy+} would also match it.
+# Three routes, one integration.
+#
+#   ANY /api/{proxy+}       JWT   the API: no token, no request reaches the service
+#   ANY /actuator/{proxy+}  JWT   the service opens /actuator/health for the
+#                                 internal ALB's probe, which never traverses
+#                                 this API; from the internet even health
+#                                 needs a token, so nothing here is an
+#                                 anonymous availability oracle
+#   $default                NONE  everything else: the console's HTML and
+#                                 JavaScript, a reload of a client-side route
+#                                 such as /alerts, and "/" itself - the
+#                                 browser has no token before it has loaded
+#                                 the page that signs it in, and the page
+#                                 holds no data
+#
+# HTTP API routing picks the most specific match, so /api/... and
+# /actuator/... always land on their JWT routes, and $default takes the
+# rest (including "/", which a /{proxy+} route would not match). The
+# service still requires a token on /api/** and denies anything that is
+# neither the console nor the API, so the open route exposes nothing new.
+# The stage throttle below bounds what the open route can cost.
 resource "aws_apigatewayv2_route" "api" {
   count              = var.enable_backend_integration ? 1 : 0
   api_id             = aws_apigatewayv2_api.this.id
@@ -78,20 +89,19 @@ resource "aws_apigatewayv2_route" "api" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
+resource "aws_apigatewayv2_route" "actuator" {
+  count              = var.enable_backend_integration ? 1 : 0
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "ANY /actuator/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.backend[0].id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 resource "aws_apigatewayv2_route" "console" {
   count              = var.enable_backend_integration ? 1 : 0
   api_id             = aws_apigatewayv2_api.this.id
-  route_key          = "ANY /{proxy+}"
-  target             = "integrations/${aws_apigatewayv2_integration.backend[0].id}"
-  authorization_type = "NONE"
-}
-
-# "/" itself is not covered by /{proxy+} (the greedy variable needs at
-# least one character), and it is the URL people type.
-resource "aws_apigatewayv2_route" "root" {
-  count              = var.enable_backend_integration ? 1 : 0
-  api_id             = aws_apigatewayv2_api.this.id
-  route_key          = "GET /"
+  route_key          = "$default"
   target             = "integrations/${aws_apigatewayv2_integration.backend[0].id}"
   authorization_type = "NONE"
 }
@@ -106,6 +116,14 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.this.id
   name        = "$default"
   auto_deploy = true
+
+  # The service's own limiter is per client address and covers /api/ only;
+  # this is the aggregate ceiling for the whole API, open route included,
+  # so an anonymous flood of page requests cannot fill the VPC link.
+  default_route_settings {
+    throttling_rate_limit  = var.throttling_rate_limit
+    throttling_burst_limit = var.throttling_burst_limit
+  }
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.access_logs.arn

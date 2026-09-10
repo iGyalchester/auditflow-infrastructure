@@ -9,7 +9,11 @@ resource "aws_cognito_user_pool" "this" {
     require_symbols   = true
   }
 
-  mfa_configuration = "OPTIONAL"
+  # Required, not optional: membership of the "operators" group below is
+  # the only gate on the cross-customer view, Cognito has no group-level
+  # MFA policy, and the ID token carries nothing the gateway could check
+  # for it, so the pool as a whole asks every user for a TOTP code.
+  mfa_configuration = "ON"
   software_token_mfa_configuration {
     enabled = true
   }
