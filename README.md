@@ -16,8 +16,10 @@ modules/
   glue/                Glue catalog + crawler over the evidence bucket.
   athena/              Athena workgroup (forced encryption) + query-results bucket.
   emr/                 EMR Serverless Spark application for anomaly-detection batch jobs.
-  cognito/             User pool (with a customer_id custom attribute) + app client.
-  api-gateway/         HTTP API Gateway with a Cognito JWT authorizer + VPC link to the ECS ALB.
+  cognito/             User pool (customer_id custom attribute, TOTP MFA required), an "operators" group, + app client.
+  api-gateway/         HTTP API Gateway: /api/** and /actuator/** behind a Cognito JWT authorizer, everything
+                       else (the console's files and routes) open, all through a VPC link to the ECS ALB;
+                       a stage-wide throttle bounds the open route.
   ecr/                 One image repository per platform service (scan-on-push, lifecycle-pruned).
   ecs/                 Fargate services for auditflow-platform, internal ALB in front of api-gateway-service.
   monitoring/          SNS alert topic, Aurora CPU alarms, API Gateway 5xx alarm.

@@ -9,7 +9,11 @@ resource "aws_cognito_user_pool" "this" {
     require_symbols   = true
   }
 
-  mfa_configuration = "OPTIONAL"
+  # Required, not optional: membership of the "operators" group below is
+  # the only gate on the cross-customer view, Cognito has no group-level
+  # MFA policy, and the ID token carries nothing the gateway could check
+  # for it, so the pool as a whole asks every user for a TOTP code.
+  mfa_configuration = "ON"
   software_token_mfa_configuration {
     enabled = true
   }
@@ -40,6 +44,19 @@ resource "aws_cognito_user_pool" "this" {
   auto_verified_attributes = ["email"]
 
   tags = var.tags
+}
+
+# Platform operators: the console shows them every customer and lets
+# them act as one. Membership lands in the ID token as cognito:groups,
+# which api-gateway-service maps to ROLE_OPERATOR; nothing else about a
+# user changes. Add people with `aws cognito-idp admin-add-user-to-group`;
+# there is deliberately no Terraform-managed member list, because who is
+# an operator is an operational decision, not infrastructure.
+resource "aws_cognito_user_group" "operators" {
+  name         = "operators"
+  user_pool_id = aws_cognito_user_pool.this.id
+  description  = "Platform operators: the console's cross-customer view and act-as."
+  precedence   = 1
 }
 
 resource "aws_cognito_user_pool_domain" "this" {
@@ -89,3 +106,5 @@ resource "aws_cognito_user_pool_client" "web" {
 
   depends_on = [aws_cognito_resource_server.api]
 }
+
+data "aws_region" "current" {}

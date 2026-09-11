@@ -99,6 +99,12 @@ variable "cognito_client_id" {
   type        = string
 }
 
+variable "cognito_hosted_ui_url" {
+  description = "Hosted UI origin (https://<prefix>.auth.<region>.amazoncognito.com), published to the console by the gateway for sign-out."
+  type        = string
+  default     = ""
+}
+
 variable "ingestion_tokens_secret_arn" {
   description = "Secrets Manager secret holding ingestion-service's AUDIT_INGESTION_TOKENS: a plain string of \"tenant=token,tenant=token\". Each token may only post events whose customerId is its own tenant. Empty = the endpoint is OPEN and any source can write as any customer, which is only ever acceptable in dev."
   type        = string

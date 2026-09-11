@@ -26,6 +26,10 @@ output "cognito_user_pool_client_id" {
   value = module.cognito.user_pool_client_id
 }
 
+output "cognito_hosted_ui_url" {
+  value = module.cognito.hosted_ui_url
+}
+
 output "api_gateway_endpoint" {
   value = module.api_gateway.api_endpoint
 }

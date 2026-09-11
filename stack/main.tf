@@ -161,6 +161,7 @@ module "ecs" {
   evidence_bucket_arn     = module.s3_evidence.bucket_arn
   cognito_user_pool_id    = module.cognito.user_pool_id
   cognito_client_id       = module.cognito.user_pool_client_id
+  cognito_hosted_ui_url   = module.cognito.hosted_ui_url
 
   ingestion_tokens_secret_arn    = var.ingestion_tokens_secret_arn
   alert_slack_webhook_secret_arn = var.alert_slack_webhook_secret_arn
