@@ -44,9 +44,14 @@ destroys are manual `workflow_dispatch` only.
 
 ## Open items (known, tracked in README)
 
+- **Cost gates.** `platform_enabled` creates the hourly-billed data plane
+  (MSK Serverless at $0.75 per cluster-hour, Aurora at its ACU floor, the
+  NAT gateway; about $615 a month idle) and is off in dev. Never add a
+  resource that bills while idle outside that gate. README "What it costs".
 - **Compute target: resolved — ECS Fargate** (`modules/ecs` + `modules/ecr`
   + a VPC link in `modules/api-gateway`), gated behind `ecs_enabled` per
-  environment so nothing bills until images exist and the flag is flipped.
+  environment (which needs `platform_enabled`) so nothing bills until
+  images exist and the flag is flipped.
   Rollout order is in the README; the app repo's `aws` profile handles MSK
   IAM auth, the RDS-managed Aurora secret, and the real evidence bucket.
 - GitHub Actions deploy role is service-scoped (`resources = ["*"]`);
