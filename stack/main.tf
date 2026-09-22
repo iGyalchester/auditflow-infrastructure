@@ -1,30 +1,39 @@
+# One root for every environment. dev, staging and prod were identical
+# apart from this literal, and each carried its own copy of the variable
+# declarations - with the *defaults* differing per environment, so the same
+# variable name meant different things in three files. Every tfvars already
+# set each of those values explicitly, so the defaults were dead weight that
+# only mattered when someone forgot one.
+#
+# State keys are unchanged (<env>/terraform.tfstate): a layout change, not a
+# state migration.
 locals {
-  environment = "staging"
-  name        = "auditflow-${local.environment}"
+  name = "auditflow-${var.environment}"
   tags = {
-    Environment = local.environment
+    Environment = var.environment
   }
 }
 
 module "network" {
-  source = "../../modules/network"
+  source = "../modules/network"
 
-  name               = local.name
-  vpc_cidr           = var.vpc_cidr
-  azs                = var.azs
-  single_nat_gateway = var.single_nat_gateway
-  tags               = local.tags
+  name                = local.name
+  vpc_cidr            = var.vpc_cidr
+  azs                 = var.azs
+  single_nat_gateway  = var.single_nat_gateway
+  nat_gateway_enabled = var.platform_enabled
+  tags                = local.tags
 }
 
 module "kms" {
-  source = "../../modules/kms"
+  source = "../modules/kms"
 
   name = local.name
   tags = local.tags
 }
 
 module "s3_evidence" {
-  source = "../../modules/s3"
+  source = "../modules/s3"
 
   bucket_name                = var.evidence_bucket_name
   kms_key_arn                = module.kms.key_arn
@@ -32,8 +41,10 @@ module "s3_evidence" {
   tags                       = local.tags
 }
 
+# Gated: MSK Serverless bills per cluster-hour from the moment it exists.
 module "msk" {
-  source = "../../modules/msk"
+  source = "../modules/msk"
+  count  = var.platform_enabled ? 1 : 0
 
   name               = local.name
   vpc_id             = module.network.vpc_id
@@ -42,8 +53,10 @@ module "msk" {
   tags               = local.tags
 }
 
+# Gated: Serverless v2 never drops below its ACU floor.
 module "aurora" {
-  source = "../../modules/aurora"
+  source = "../modules/aurora"
+  count  = var.platform_enabled ? 1 : 0
 
   name                = local.name
   vpc_id              = module.network.vpc_id
@@ -59,7 +72,7 @@ module "aurora" {
 }
 
 module "glue" {
-  source = "../../modules/glue"
+  source = "../modules/glue"
 
   name                 = local.name
   evidence_bucket_name = module.s3_evidence.bucket_name
@@ -68,7 +81,7 @@ module "glue" {
 }
 
 module "athena" {
-  source = "../../modules/athena"
+  source = "../modules/athena"
 
   name        = local.name
   kms_key_arn = module.kms.key_arn
@@ -76,7 +89,7 @@ module "athena" {
 }
 
 module "emr" {
-  source = "../../modules/emr"
+  source = "../modules/emr"
 
   name                 = local.name
   vpc_id               = module.network.vpc_id
@@ -88,7 +101,7 @@ module "emr" {
 }
 
 module "cognito" {
-  source = "../../modules/cognito"
+  source = "../modules/cognito"
 
   name          = local.name
   domain_prefix = var.cognito_domain_prefix
@@ -98,7 +111,7 @@ module "cognito" {
 }
 
 module "api_gateway" {
-  source = "../../modules/api-gateway"
+  source = "../modules/api-gateway"
 
   name                 = local.name
   aws_region           = var.aws_region
@@ -110,22 +123,26 @@ module "api_gateway" {
   vpc_link_subnet_ids         = module.network.private_subnet_ids
   vpc_link_security_group_ids = module.ecs[*].alb_security_group_id
 
+  console_domain            = var.console_domain
+  hosted_zone_name          = var.hosted_zone_name
+  console_certificate_ready = var.console_certificate_ready
+
   tags = local.tags
 }
 
 module "monitoring" {
-  source = "../../modules/monitoring"
+  source = "../modules/monitoring"
 
   name                        = local.name
   alert_email                 = var.alert_email
-  aurora_instance_identifiers = module.aurora.instance_identifiers
+  aurora_instance_identifiers = flatten(module.aurora[*].instance_identifiers)
   api_gateway_log_group_name  = module.api_gateway.access_log_group_name
   tags                        = local.tags
 }
 
 
 module "ecr" {
-  source = "../../modules/ecr"
+  source = "../modules/ecr"
 
   name = local.name
   tags = local.tags
@@ -135,7 +152,7 @@ module "ecr" {
 # THEN flip ecs_enabled - otherwise every task crash-loops pulling from an
 # empty registry while the ALB and Fargate bill by the hour.
 module "ecs" {
-  source = "../../modules/ecs"
+  source = "../modules/ecs"
   count  = var.ecs_enabled ? 1 : 0
 
   name                    = local.name
@@ -145,15 +162,17 @@ module "ecs" {
   repository_urls         = module.ecr.repository_urls
   image_tag               = var.ecs_image_tag
   desired_count           = var.ecs_desired_count
-  kafka_bootstrap_servers = module.msk.bootstrap_brokers_sasl_iam
-  msk_cluster_arn         = module.msk.cluster_arn
-  aurora_endpoint         = module.aurora.cluster_endpoint
-  aurora_secret_arn       = module.aurora.master_user_secret_arn
+  kafka_bootstrap_servers = one(module.msk[*].bootstrap_brokers_sasl_iam)
+  msk_cluster_arn         = one(module.msk[*].cluster_arn)
+  aurora_endpoint         = one(module.aurora[*].cluster_endpoint)
+  aurora_secret_arn       = one(module.aurora[*].master_user_secret_arn)
   evidence_bucket_name    = module.s3_evidence.bucket_name
   evidence_bucket_arn     = module.s3_evidence.bucket_arn
   cognito_user_pool_id    = module.cognito.user_pool_id
   cognito_client_id       = module.cognito.user_pool_client_id
+  cognito_hosted_ui_url   = module.cognito.hosted_ui_url
 
+  ingestion_tokens_secret_arn    = var.ingestion_tokens_secret_arn
   alert_slack_webhook_secret_arn = var.alert_slack_webhook_secret_arn
   alert_email_from               = var.alert_email_from
   alert_email_to                 = var.alert_email_to

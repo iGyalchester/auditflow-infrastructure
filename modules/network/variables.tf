@@ -19,6 +19,12 @@ variable "single_nat_gateway" {
   default     = true
 }
 
+variable "nat_gateway_enabled" {
+  description = "Create NAT gateway(s) for the private subnets. false leaves them with no route out, which is fine while nothing runs in them; the S3 gateway endpoint still works."
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

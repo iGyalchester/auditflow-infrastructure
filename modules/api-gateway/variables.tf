@@ -38,6 +38,18 @@ variable "vpc_link_security_group_ids" {
   default     = []
 }
 
+variable "throttling_rate_limit" {
+  description = "Stage-wide steady-state requests per second across every route (the service limiter is per client on /api/ only)."
+  type        = number
+  default     = 100
+}
+
+variable "throttling_burst_limit" {
+  description = "Stage-wide burst across every route."
+  type        = number
+  default     = 200
+}
+
 variable "log_retention_days" {
   type    = number
   default = 90
@@ -46,4 +58,22 @@ variable "log_retention_days" {
 variable "tags" {
   type    = map(string)
   default = {}
+}
+
+variable "console_domain" {
+  description = "Custom domain for the console and API, e.g. auditflow.areyouinquazzy.lol. Empty = no certificate, no domain name, no DNS: the execute-api URL stays the only entry."
+  type        = string
+  default     = ""
+}
+
+variable "hosted_zone_name" {
+  description = "Public Route 53 zone that holds console_domain (e.g. areyouinquazzy.lol), when this account hosts it. Empty = the zone lives elsewhere; the outputs then say which CNAMEs to create by hand."
+  type        = string
+  default     = ""
+}
+
+variable "console_certificate_ready" {
+  description = "Zone elsewhere only: set to true once the certificate's validation CNAME (from the outputs) exists at the registrar, so the second apply can validate and create the domain name. Ignored when hosted_zone_name is set."
+  type        = bool
+  default     = false
 }
