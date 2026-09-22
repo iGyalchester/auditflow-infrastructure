@@ -77,10 +77,27 @@ variable "alert_email" {
 }
 
 
+# The pieces that bill by the hour whether or not a single event flows:
+# the MSK Serverless cluster (about $0.75 per cluster-hour, so roughly
+# $540 a month on its own - "serverless" means no brokers to size, not
+# scale-to-zero), the Aurora Serverless v2 instance at its ACU floor and
+# the NAT gateway. Off, an apply creates only what is free while idle:
+# the VPC, S3, KMS, Cognito, API Gateway, Glue, Athena, the EMR
+# application, ECR. No default: an environment must say which it is.
+variable "platform_enabled" {
+  description = "Create the hourly-billed data plane: MSK Serverless, Aurora and the NAT gateway. false leaves only the free-while-idle pieces; ecs_enabled needs this true."
+  type        = bool
+}
+
 variable "ecs_enabled" {
-  description = "Provision the Fargate services + internal ALB. Off by default: push images first (Deploy workflow in auditflow-platform), then flip - compute bills from the moment this applies."
+  description = "Provision the Fargate services + internal ALB. Off by default: push images first (Deploy workflow in auditflow-platform), then flip - compute bills from the moment this applies. Needs platform_enabled."
   type        = bool
   default     = false
+
+  validation {
+    condition     = !var.ecs_enabled || var.platform_enabled
+    error_message = "ecs_enabled needs platform_enabled = true: the services have nothing to talk to without Kafka, Aurora and a NAT gateway."
+  }
 }
 
 variable "ecs_image_tag" {

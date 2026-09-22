@@ -17,11 +17,12 @@ locals {
 module "network" {
   source = "../modules/network"
 
-  name               = local.name
-  vpc_cidr           = var.vpc_cidr
-  azs                = var.azs
-  single_nat_gateway = var.single_nat_gateway
-  tags               = local.tags
+  name                = local.name
+  vpc_cidr            = var.vpc_cidr
+  azs                 = var.azs
+  single_nat_gateway  = var.single_nat_gateway
+  nat_gateway_enabled = var.platform_enabled
+  tags                = local.tags
 }
 
 module "kms" {
@@ -40,8 +41,10 @@ module "s3_evidence" {
   tags                       = local.tags
 }
 
+# Gated: MSK Serverless bills per cluster-hour from the moment it exists.
 module "msk" {
   source = "../modules/msk"
+  count  = var.platform_enabled ? 1 : 0
 
   name               = local.name
   vpc_id             = module.network.vpc_id
@@ -50,8 +53,10 @@ module "msk" {
   tags               = local.tags
 }
 
+# Gated: Serverless v2 never drops below its ACU floor.
 module "aurora" {
   source = "../modules/aurora"
+  count  = var.platform_enabled ? 1 : 0
 
   name                = local.name
   vpc_id              = module.network.vpc_id
@@ -130,7 +135,7 @@ module "monitoring" {
 
   name                        = local.name
   alert_email                 = var.alert_email
-  aurora_instance_identifiers = module.aurora.instance_identifiers
+  aurora_instance_identifiers = flatten(module.aurora[*].instance_identifiers)
   api_gateway_log_group_name  = module.api_gateway.access_log_group_name
   tags                        = local.tags
 }
@@ -157,10 +162,10 @@ module "ecs" {
   repository_urls         = module.ecr.repository_urls
   image_tag               = var.ecs_image_tag
   desired_count           = var.ecs_desired_count
-  kafka_bootstrap_servers = module.msk.bootstrap_brokers_sasl_iam
-  msk_cluster_arn         = module.msk.cluster_arn
-  aurora_endpoint         = module.aurora.cluster_endpoint
-  aurora_secret_arn       = module.aurora.master_user_secret_arn
+  kafka_bootstrap_servers = one(module.msk[*].bootstrap_brokers_sasl_iam)
+  msk_cluster_arn         = one(module.msk[*].cluster_arn)
+  aurora_endpoint         = one(module.aurora[*].cluster_endpoint)
+  aurora_secret_arn       = one(module.aurora[*].master_user_secret_arn)
   evidence_bucket_name    = module.s3_evidence.bucket_name
   evidence_bucket_arn     = module.s3_evidence.bucket_arn
   cognito_user_pool_id    = module.cognito.user_pool_id

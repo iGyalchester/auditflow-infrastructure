@@ -92,6 +92,23 @@ running Jenkins elsewhere and want parity, swapping this workflow for a
 OIDC role is a straightforward port - flagging this now rather than
 silently picking one for you.
 
+## What it costs
+
+Two switches per environment, both in its tfvars:
+
+| Switch | What it creates | Idle cost, roughly |
+|---|---|---|
+| neither | VPC, S3 (evidence + Athena results), KMS, Cognito, API Gateway, Glue, Athena, the EMR Serverless application, ECR, CloudWatch | cents (KMS is $1 a month per key; everything else bills per use) |
+| `platform_enabled` | MSK Serverless, Aurora Serverless v2, the NAT gateway | about $615 a month: MSK $0.75 per cluster-hour (~$540) whether or not a message flows, Aurora at its 0.5 ACU floor (~$43), one NAT gateway (~$33) |
+| `ecs_enabled` (needs the above) | the four Fargate services and the internal ALB | about $16 for the ALB plus the tasks |
+
+"Serverless" on MSK and Aurora means nothing to size or patch, not
+scale-to-zero. Both bill from the moment they exist, so `platform_enabled`
+is off in dev and on only where something is meant to run. Flipping it
+off destroys the cluster, the Aurora instance (dev skips the final
+snapshot) and the NAT gateway on the next apply; flipping it on recreates
+them empty.
+
 ## Getting started
 
 Requires Terraform >= 1.10, an AWS account, and credentials with enough
@@ -264,8 +281,8 @@ the environment configuration.
   Fargate** (`modules/ecs` + a VPC link in `modules/api-gateway`), gated
   behind `ecs_enabled` per environment. Rollout order: apply (creates the
   ECR repos), run the **Deploy** workflow in `auditflow-platform` to push
-  images, flip `ecs_enabled = true` in the environment's tfvars, apply
-  again. Fargate + the internal ALB bill from that second apply onward;
+  images, flip `platform_enabled = true` and `ecs_enabled = true` in the
+  environment's tfvars, apply again. Fargate + the internal ALB bill from that second apply onward;
   the app services' `aws` Spring profile handles MSK IAM auth and the
   RDS-managed Aurora credentials.
 - **IAM policy on the GitHub Actions role is service-scoped, not

@@ -7,15 +7,15 @@ output "evidence_bucket_name" {
 }
 
 output "msk_bootstrap_brokers" {
-  value = module.msk.bootstrap_brokers_sasl_iam
+  value = one(module.msk[*].bootstrap_brokers_sasl_iam)
 }
 
 output "aurora_cluster_endpoint" {
-  value = module.aurora.cluster_endpoint
+  value = one(module.aurora[*].cluster_endpoint)
 }
 
 output "aurora_master_user_secret_arn" {
-  value = module.aurora.master_user_secret_arn
+  value = one(module.aurora[*].master_user_secret_arn)
 }
 
 output "cognito_user_pool_id" {

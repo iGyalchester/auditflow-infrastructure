@@ -2,7 +2,7 @@ locals {
   az_count      = length(var.azs)
   public_cidrs  = [for i in range(local.az_count) : cidrsubnet(var.vpc_cidr, 4, i)]
   private_cidrs = [for i in range(local.az_count) : cidrsubnet(var.vpc_cidr, 4, i + local.az_count)]
-  nat_gw_count  = var.single_nat_gateway ? 1 : local.az_count
+  nat_gw_count  = var.nat_gateway_enabled ? (var.single_nat_gateway ? 1 : local.az_count) : 0
 }
 
 resource "aws_vpc" "this" {
@@ -67,9 +67,14 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table" "private" {
   count  = local.az_count
   vpc_id = aws_vpc.this.id
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this[var.single_nat_gateway ? 0 : count.index].id
+  # No NAT gateway, no default route: private subnets then reach only the
+  # S3 endpoint below, which is all an idle environment needs.
+  dynamic "route" {
+    for_each = var.nat_gateway_enabled ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.this[var.single_nat_gateway ? 0 : count.index].id
+    }
   }
   tags = merge(var.tags, { Name = "${var.name}-private-rt-${count.index}" })
 }

@@ -42,8 +42,14 @@ cognito_logout_urls   = ["http://localhost:5173/"]
 
 alert_email = null
 
+# The hourly-billed data plane (MSK Serverless, Aurora, the NAT gateway):
+# about $615 a month even when idle, MSK alone $0.75 per cluster-hour.
+# Off until there is something to run; flip together with ecs_enabled.
+platform_enabled = false
+
 # Flip to true only after images exist in ECR (see auditflow-platform's
-# Deploy workflow) - Fargate + the ALB start billing on apply.
+# Deploy workflow) - Fargate + the ALB start billing on apply. Needs
+# platform_enabled.
 ecs_enabled       = false
 ecs_image_tag     = "latest"
 ecs_desired_count = 1

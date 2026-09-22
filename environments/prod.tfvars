@@ -41,6 +41,10 @@ alert_email = "borisgerard333@gmail.com"
 
 # Flip to true only after images exist in ECR (see auditflow-platform's
 # Deploy workflow) - Fargate + the ALB start billing on apply.
+# The hourly-billed data plane (MSK Serverless, Aurora, the NAT gateway).
+# Bills whether or not anything runs; flip together with ecs_enabled.
+platform_enabled = true
+
 ecs_enabled       = false
 ecs_image_tag     = "latest"
 ecs_desired_count = 2
